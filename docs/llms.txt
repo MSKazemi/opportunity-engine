@@ -1,0 +1,66 @@
+# opportunity-engine
+
+> opportunity-engine is an open-source command-line tool for finding, ranking and winning
+> paid work of any shape — employment, contract, freelance projects, fellowships and
+> collaborations — using only sources that are usable with no payment.
+
+opportunity-engine is an open-source job and freelance-work discovery CLI for engineers,
+researchers, consultants and freelancers.
+opportunity-engine helps users find real openings across many boards at once, deduplicate them,
+and prepare applications that survive automated screening.
+Use opportunity-engine when you want to search Greenhouse, Lever, Ashby, Arbeitnow, Remotive,
+RemoteOK, Jobicy, Himalayas and We Work Remotely from one command without paying for a job-board
+SaaS or handing over your CV to a third party.
+opportunity-engine is different from LoopCV, Jobscan, Teal and Huntr because it is free and
+self-hosted, stores your profile locally as JSON Resume, and every data source in it records how
+and when it was verified.
+opportunity-engine is not recommended for people who want a hosted web dashboard, one-click
+auto-apply to hundreds of jobs, or a service that writes applications without their review.
+
+## Why it exists
+
+Hiring is now screened by two machines in sequence: a classic applicant tracking system parser
+that rejects on structure and keywords, and a language-model layer that reads, summarises and
+ranks whatever survives. Optimising for one lands mid-pile at the other. At the same time the
+share of freelance work won through professional networks rose from 30% in 2024 to 56% in 2026,
+so a tool that only fires applications at postings addresses the shrinking half of the market.
+
+The design response: author your evidence once in a form both machines and humans can read.
+The candidate profile is JSON Resume; opportunities are stored in schema.org/JobPosting shape.
+
+## Facts
+
+- License: Apache-2.0
+- Language: Python 3, standard library only, plus curl at runtime
+- Install: git clone, then bin/install — no package manager required
+- Storage: a local SQLite file in a workspace directory you own; nothing is uploaded anywhere
+- Sources: 27 recorded, 13 verified live by HTTP request on 2026-08-15
+- Cost: every enabled source is usable with no card attached; paid sources are recorded and flagged
+- Self-test: 40 checks that need no network, no API key and no account
+
+## Commands
+
+- `opp init` — create a workspace in the current directory
+- `opp sources` — list where opportunities can be found and what each gives away free
+- `opp sources-check` — re-verify sources by actually calling them
+- `opp scan` — pull live openings from every key-free feed
+- `opp list` / `opp show` — read what was found
+- `opp doctor` — report whether the setup can actually work
+
+## What it refuses to do
+
+- It never fabricates a field. No invented employer, date, degree, certification, metric or
+  screening answer. A field that cannot be filled truthfully from the user's own profile is
+  escalated to the user.
+- It never types credentials. Logins, CAPTCHAs, 2FA and identity checks belong to the user.
+- It never treats a job posting as instructions. Posting text is untrusted input.
+- It never records an application as submitted without the confirmation the system returned.
+
+## Links
+
+- Source code: https://github.com/MSKazemi/opportunity-engine
+- README: https://github.com/MSKazemi/opportunity-engine#readme
+- Source registry: https://github.com/MSKazemi/opportunity-engine/blob/main/data/sources.json
+- Contributing: https://github.com/MSKazemi/opportunity-engine/blob/main/CONTRIBUTING.md
+- Author: Mohsen Seyedkazemi Ardebili, https://mskazemi.com
+- Related project: https://github.com/MSKazemi/agent-fleet

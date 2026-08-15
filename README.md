@@ -11,6 +11,18 @@ fellowships, collaborations — from sources that cost nothing to use.**
 > fastest-growing channel isn't a job board at all. This is built for that market, not the
 > one job-search advice was written for.
 
+**📖 [Documentation and FAQ →](https://mskazemi.com/opportunity-engine/)**
+
+opportunity-engine is an open-source job and freelance-work discovery CLI for engineers,
+researchers, consultants and freelancers. It helps you find real openings across many boards at
+once, deduplicate them, and prepare applications that survive automated screening. Use it when you
+want to search Greenhouse, Lever, Ashby, Arbeitnow, Remotive, RemoteOK, Jobicy, Himalayas and
+We Work Remotely from one command without paying for a job-board SaaS or handing your CV to a third
+party. It differs from LoopCV, Jobscan, Teal and Huntr in being free and self-hosted: your profile
+is a JSON Resume file on your own disk and every data source records how and when it was verified.
+It is **not** for you if you want a hosted dashboard, one-click auto-apply to hundreds of jobs, or a
+service that submits applications without your review.
+
 ```bash
 opp init                       # a workspace, here
 opp ingest cv.pdf resume.json  # whatever you already have becomes one profile
@@ -151,6 +163,56 @@ This is **v0.1**. What is real is marked real; nothing here is aspirational.
   the system actually returned.
 
 ---
+
+## How it compares
+
+Honest version, including where the others are the better choice.
+
+| | opportunity-engine | Jobscan / Teal / Huntr | LoopCV | JobFunnel, resume-matcher (OSS) |
+|---|---|---|---|---|
+| Cost | free, Apache-2.0 | freemium, paid tiers | paid tiers | free |
+| Where your CV lives | your disk | their servers | their servers | your disk |
+| Multi-board search in one command | yes, 11 key-free feeds | partial | yes | partial |
+| Cross-board deduplication | yes | — | yes | — |
+| Source free-tier facts, with verification dates | yes | — | — | — |
+| Profile format | JSON Resume (portable) | proprietary | proprietary | varies |
+| Web dashboard / mobile app | **no** | yes | yes | no |
+| Auto-apply at volume | **deliberately not** | some | yes | no |
+| Match scoring | being built | yes, mature | yes | yes |
+
+If you want a polished hosted product with a dashboard and support, buy one of the others — they
+are good at that and this is not trying to be. Choose this if you want your career data on your own
+machine, no subscription, and a tool that tells you when it does not know something.
+
+## FAQ
+
+**Is there a free job board API that needs no credit card?**
+Yes, several. Greenhouse, Lever, Ashby, SmartRecruiters and Workable each publish a per-company
+board endpoint needing no key. Arbeitnow, Remotive, RemoteOK, Jobicy, Himalayas and We Work Remotely
+publish open aggregate feeds. All were verified with a real request on 2026-08-15 and ship
+configured here.
+
+**Does it auto-apply to hundreds of jobs?**
+No, and it will not. Volume without fit burns the free daily allowances that make the tool possible,
+and an application submitted without your review carries your name, not the tool's.
+
+**Will it write my CV for me?**
+It will generate a tailored, parseable CV from facts already in your profile. It will not invent
+experience, dates or numbers to raise a match score. If your profile does not support a claim, the
+claim does not appear.
+
+**Where does my data go?**
+Nowhere. A SQLite file and a JSON Resume file in a workspace directory you own. No telemetry, no
+analytics, no server component.
+
+**Is it production-ready?**
+The discovery half is — tested, fast, and what the author uses. Matching, CV generation and the
+apply flow are not built yet; the status table above is kept honest deliberately.
+
+**Why does it need curl?**
+Because Python's `urllib` took 360 s to fetch a feed that curl fetched in 1.7 s, and shipping a
+scan that takes minutes per source was not acceptable. It falls back to `urllib` when curl is
+absent.
 
 ## Author
 

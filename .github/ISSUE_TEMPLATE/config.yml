@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/MSKazemi/opportunity-engine/security/advisories/new
+    about: Report privately, not as a public issue.
+  - name: How do I use this?
+    url: https://mskazemi.com/opportunity-engine/
+    about: The docs site answers the common questions.

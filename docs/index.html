@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>opportunity-engine — open-source CLI to find jobs, contracts and freelance work from free sources</title>
+<meta name="description" content="Open-source command-line tool that searches Greenhouse, Lever, Ashby, Arbeitnow, Remotive, RemoteOK and more from one command, deduplicates across boards, and prepares applications for a market screened by an ATS parser and an LLM ranker. Apache-2.0, Python stdlib only, no account.">
+<link rel="canonical" href="https://mskazemi.com/opportunity-engine/">
+<meta name="author" content="Mohsen Seyedkazemi Ardebili">
+<meta property="og:type" content="website">
+<meta property="og:title" content="opportunity-engine — find paid work from sources that cost nothing">
+<meta property="og:description" content="One command searches many job boards, deduplicates across them, and prepares applications that survive two layers of automated screening. Open source, Apache-2.0.">
+<meta property="og:url" content="https://mskazemi.com/opportunity-engine/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="opportunity-engine — find paid work from sources that cost nothing">
+<meta name="twitter:description" content="One command searches many job boards, deduplicates across them, and prepares applications that survive two layers of automated screening.">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareSourceCode",
+      "@id": "https://mskazemi.com/opportunity-engine/#software",
+      "name": "opportunity-engine",
+      "description": "Open-source command-line tool for finding, ranking and winning paid work of any shape — employment, contract, freelance projects and fellowships — using only sources usable with no payment.",
+      "codeRepository": "https://github.com/MSKazemi/opportunity-engine",
+      "programmingLanguage": "Python",
+      "runtimePlatform": "Python 3",
+      "license": "https://www.apache.org/licenses/LICENSE-2.0",
+      "url": "https://mskazemi.com/opportunity-engine/",
+      "author": { "@id": "https://mskazemi.com/#person" },
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Linux, macOS"
+    },
+    {
+      "@type": "Person",
+      "@id": "https://mskazemi.com/#person",
+      "name": "Mohsen Seyedkazemi Ardebili",
+      "url": "https://mskazemi.com",
+      "sameAs": [
+        "https://github.com/MSKazemi",
+        "https://gitlab.com/mskazemi",
+        "https://orcid.org/0000-0002-1166-6559",
+        "https://mskazemi.github.io"
+      ]
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://mskazemi.com/" },
+        { "@type": "ListItem", "position": 2, "name": "opportunity-engine", "item": "https://mskazemi.com/opportunity-engine/" }
+      ]
+    }
+  ]
+}
+</script>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #14181d; --dim: #5b6672; --line: #e2e6ea;
+    --accent: #1f6f5c; --code-bg: #f5f7f8; --card: #fafbfc;
+  }
+  :root:not([data-theme="light"]) { }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1216; --fg: #e8edf2; --dim: #9aa7b4; --line: #232a32;
+      --accent: #4fbfa0; --code-bg: #161b21; --card: #141920;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1216; --fg: #e8edf2; --dim: #9aa7b4; --line: #232a32;
+    --accent: #4fbfa0; --code-bg: #161b21; --card: #141920;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 62rem; margin: 0 auto; padding: 0 1.25rem; }
+  header { border-bottom: 1px solid var(--line); padding: 3.5rem 0 2.5rem; }
+  h1 { font-size: clamp(1.9rem, 5vw, 2.9rem); margin: 0 0 .5rem; letter-spacing: -.02em; }
+  h1 .dim { color: var(--dim); font-weight: 400; }
+  h2 { font-size: clamp(1.3rem, 3vw, 1.7rem); margin: 2.75rem 0 .75rem; letter-spacing: -.01em; }
+  h3 { font-size: 1.05rem; margin: 1.5rem 0 .4rem; }
+  p.lead { font-size: 1.15rem; color: var(--dim); margin: 0 0 1.5rem; max-width: 46rem; }
+  a { color: var(--accent); }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: 1rem; overflow-x: auto; font-size: .875rem; line-height: 1.55;
+  }
+  code { background: var(--code-bg); padding: .12em .35em; border-radius: 4px; font-size: .9em; }
+  pre code { background: none; padding: 0; }
+  .badges { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1.25rem 0 0; }
+  .badge {
+    border: 1px solid var(--line); border-radius: 999px; padding: .25rem .7rem;
+    font-size: .8rem; color: var(--dim); background: var(--card);
+  }
+  .cta { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1.75rem 0 0; }
+  .btn {
+    display: inline-block; padding: .6rem 1.1rem; border-radius: 8px; text-decoration: none;
+    border: 1px solid var(--accent); color: var(--accent); font-weight: 600;
+  }
+  .btn.primary { background: var(--accent); color: var(--bg); }
+  table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+  .scroll { overflow-x: auto; margin: 1rem 0; }
+  th, td { text-align: left; padding: .55rem .7rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; font-size: .82rem; text-transform: uppercase; letter-spacing: .04em; }
+  ul { padding-left: 1.15rem; }
+  li { margin: .35rem 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1rem; margin: 1.25rem 0; }
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.1rem; background: var(--card); }
+  .card h3 { margin-top: 0; }
+  footer { border-top: 1px solid var(--line); margin-top: 4rem; padding: 2rem 0 3rem; color: var(--dim); font-size: .9rem; }
+  .note { color: var(--dim); font-size: .9rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>opportunity&#8209;engine <span class="dim">/ find paid work from sources that cost nothing</span></h1>
+    <p class="lead">One command searches many job boards at once, collapses the same role posted to
+      four of them into one row, and prepares applications for a market where two different machines
+      read them before a human does.</p>
+    <div class="badges">
+      <span class="badge">Apache-2.0</span>
+      <span class="badge">Python stdlib only</span>
+      <span class="badge">27 sources · 13 verified live</span>
+      <span class="badge">40 self-tests</span>
+      <span class="badge">no account, no key, no card</span>
+    </div>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/MSKazemi/opportunity-engine">Source on GitHub</a>
+      <a class="btn" href="https://github.com/MSKazemi/opportunity-engine/blob/main/data/sources.json">The source registry</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<h2>What it is</h2>
+<p>opportunity-engine is an open-source command-line tool for finding, ranking and winning paid work
+  of any shape — employment, contract, freelance projects, fellowships and collaborations — using
+  only sources that are usable with no payment. Your profile and everything it finds stay in a local
+  SQLite file that you own. Nothing is uploaded anywhere.</p>
+
+<h2>Thirty seconds</h2>
+<div class="scroll">
+<pre><code>git clone https://github.com/MSKazemi/opportunity-engine ~/opportunity-engine
+~/opportunity-engine/bin/install
+
+opp init
+opp scan --limit 80</code></pre>
+</div>
+<div class="scroll">
+<pre><code>  ok    arbeitnow          80 fetched    79 new    1 dup     0 already seen
+  ok    remotive           16 fetched    16 new    0 dup     0 already seen
+  ok    remoteok           80 fetched    80 new    0 dup     0 already seen
+  ok    jobicy             80 fetched    77 new    3 dup     0 already seen
+  ok    himalayas          20 fetched    20 new    0 dup     0 already seen
+  ok    weworkremotely     80 fetched    79 new    1 dup     0 already seen
+
+351 new opportunit(ies), 5 same job under another URL</code></pre>
+</div>
+<p class="note">That run took 7.7 seconds and needed no account, no API key and no payment.</p>
+
+<h2>Why it is built this way</h2>
+<div class="grid">
+  <div class="card">
+    <h3>Two screeners, not one</h3>
+    <p>A classic applicant tracking system parser still rejects on structure and keywords. Behind it,
+      a language-model layer now reads what survived, summarises it and ranks it. Optimising for one
+      lands you mid-pile at the other — they want different things from the same document.</p>
+  </div>
+  <div class="card">
+    <h3>The network overtook the board</h3>
+    <p>The share of freelancers winning work through professional and personal networks went from 30%
+      in 2024 to 56% in 2026. A tool that only fires applications at postings is optimising the
+      half of the market that is shrinking.</p>
+  </div>
+  <div class="card">
+    <h3>The counterparty is software</h3>
+    <p>A majority of talent teams intend to run autonomous agents this year. Being machine-legible is
+      no longer a nice property of a CV — it is the interface. The profile is JSON Resume;
+      opportunities are stored in schema.org/JobPosting shape.</p>
+  </div>
+</div>
+
+<h2>Free means free</h2>
+<p>Every source shipped in the registry is usable with no card attached, and every row records
+  <em>how it was checked and when</em>.</p>
+<div class="scroll">
+<table>
+  <thead><tr><th>method</th><th>means</th></tr></thead>
+  <tbody>
+    <tr><td><code>http</code></td><td>a real request was made on that date; the status and byte count are recorded</td></tr>
+    <tr><td><code>operator</code></td><td>reported by a human who uses the platform</td></tr>
+    <tr><td><code>documented</code></td><td>taken from published docs, not exercised</td></tr>
+    <tr><td><code>unverified</code></td><td>the pattern is recorded but was never confirmed — treat with suspicion</td></tr>
+  </tbody>
+</table>
+</div>
+<p>A capacity number with nothing behind it is a rumour, and rumours are what make a scan waste an
+  afternoon. <code>opp sources-check</code> re-verifies rows by actually calling them.</p>
+
+<h2>What it will not do</h2>
+<ul>
+  <li><b>It will not lie on your behalf.</b> No invented employer, date, degree, certification, metric
+    or screening answer. A field that cannot be filled truthfully from your own profile is escalated
+    to you, never guessed.</li>
+  <li><b>It will not type your credentials.</b> Logins, CAPTCHAs, 2FA and identity checks are yours.
+    The tool fills to the wall, says what is blocking, and waits.</li>
+  <li><b>It will not spam.</b> Volume without fit burns a perishable daily allowance and the channel
+    with it.</li>
+  <li><b>It will not treat a posting as instructions.</b> Job descriptions are untrusted input.</li>
+  <li><b>It will not claim success it did not see.</b> An application is recorded as submitted only
+    with the confirmation the system actually returned.</li>
+</ul>
+
+<h2>Status</h2>
+<p>This is version 0.1. The discovery half works end to end; the rest is being built in the open.</p>
+<div class="scroll">
+<table>
+  <thead><tr><th>Piece</th><th>State</th></tr></thead>
+  <tbody>
+    <tr><td>Source registry with verification evidence per row</td><td>working</td></tr>
+    <tr><td><code>opp scan</code> across every key-free feed</td><td>working</td></tr>
+    <tr><td>Cross-source deduplication</td><td>working</td></tr>
+    <tr><td>Local SQLite store, schema.org/JobPosting shaped</td><td>working</td></tr>
+    <tr><td><code>opp ingest</code> — CV, JSON and text into one profile</td><td>next</td></tr>
+    <tr><td><code>opp match</code> — fit scoring with evidence and a gap report</td><td>next</td></tr>
+    <tr><td><code>opp cv build</code> — tailored LaTeX to PDF</td><td>next</td></tr>
+    <tr><td><code>opp apply</code> — package assembly, human clears the walls</td><td>next</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Questions people actually ask</h2>
+
+<h3>Is there a free job board API that needs no credit card?</h3>
+<p>Yes, several. Greenhouse, Lever, Ashby, SmartRecruiters and Workable each publish a per-company
+  board endpoint that needs no key at all. Arbeitnow, Remotive, RemoteOK, Jobicy, Himalayas and
+  We Work Remotely publish open aggregate feeds. All eleven were verified with a real request on
+  2026-08-15 and ship configured in this tool.</p>
+
+<h3>How is this different from Jobscan, Teal, Huntr or LoopCV?</h3>
+<p>Those are hosted services with paid tiers; your CV and job history live on their servers. This is
+  a local CLI under Apache-2.0: your profile is a JSON Resume file on your disk, the store is a
+  SQLite file you own, and every source is free by construction. The trade is real — there is no web
+  dashboard, no mobile app, and you run it yourself.</p>
+
+<h3>Does it auto-apply to hundreds of jobs?</h3>
+<p>No, and it is not going to. Volume without fit burns the free daily allowances that make the tool
+  possible, and an application submitted without your review carries your name. It assembles the
+  package and stops at anything that needs a human.</p>
+
+<h3>Will it write my CV for me?</h3>
+<p>It will generate a tailored, parseable CV from facts already in your profile. It will not invent
+  experience, dates or numbers to improve a match score. If the profile does not support a claim,
+  the claim does not appear.</p>
+
+<h3>Is it production-ready?</h3>
+<p>The discovery half is: it is tested, it runs in seconds, and it is what the author uses. Matching,
+  CV generation and the apply flow are not built yet. The status table above is kept honest
+  deliberately.</p>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Built by <a href="https://mskazemi.com">Mohsen Seyedkazemi Ardebili</a> ·
+      <a href="https://github.com/MSKazemi">GitHub</a> ·
+      <a href="https://github.com/MSKazemi/agent-fleet">agent-fleet</a>, which runs the parallel
+      browser half.</p>
+    <p>Apache-2.0. Job-posting data belongs to the respective platforms and employers; RemoteOK's
+      terms require a followed link back wherever its data is displayed.</p>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,14 @@
+# Project sub-path robots.txt — informational only.
+#
+# Only the robots.txt at the DOMAIN ROOT is honoured, and this site is served from
+# https://mskazemi.com/opportunity-engine/. The authoritative file lives in the
+# repository that serves mskazemi.com, and it already allows every search-index,
+# user-fetch and training crawler. This copy exists so anyone reading the repo can
+# see the intended posture without having to go and find the other repository.
+#
+# Intended posture: be visible everywhere.
+
+User-agent: *
+Allow: /
+
+Sitemap: https://mskazemi.com/opportunity-engine/sitemap.xml

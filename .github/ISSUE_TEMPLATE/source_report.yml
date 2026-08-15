@@ -1,0 +1,29 @@
+name: Source is wrong or dead
+description: A row in data/sources.json no longer matches reality
+labels: ["source"]
+body:
+  - type: input
+    id: source
+    attributes:
+      label: Source id
+      placeholder: arbeitnow
+    validations: { required: true }
+  - type: dropdown
+    id: problem
+    attributes:
+      label: What is wrong
+      options:
+        - The endpoint is dead or moved
+        - The free allowance changed
+        - It now requires a card or a key
+        - The payload shape changed and rows come out empty
+        - It should not be listed at all
+        - Something else
+    validations: { required: true }
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Output of `opp sources-check --id <source>`
+      render: shell
+      description: This is what turns a report into a fix. Please include it.
+    validations: { required: true }

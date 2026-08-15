@@ -1,0 +1,28 @@
+name: Propose a new source
+description: A board, marketplace or feed worth adding
+labels: ["source", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The bar is: usable with **no card attached**, and you can say how you verified it.
+        Paid sources can still be recorded — they just get flagged so runs can exclude them.
+  - type: input
+    id: name
+    attributes: { label: Name and URL }
+    validations: { required: true }
+  - type: dropdown
+    id: verified
+    attributes:
+      label: How do you know its free allowance?
+      options:
+        - I called the endpoint myself (http)
+        - I use the platform and this is its real free allowance (operator)
+        - It is in their published documentation (documented)
+        - I am not sure (unverified)
+    validations: { required: true }
+  - type: textarea
+    id: detail
+    attributes:
+      label: Endpoint, free allowance, region, and what kind of work it carries
+    validations: { required: true }
