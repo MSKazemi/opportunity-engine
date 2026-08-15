@@ -93,6 +93,10 @@ check("per-company boards are flagged, not guessed from the URL", True,
       all("{" in (s.get("access") or {}).get("endpoint", "") for s in per_company))
 check("a per-company board asks for a sample rather than inventing one", "needs-sample",
       sources.check({"id": "x", "access": {"endpoint": "https://e/{company}", "per_company": True}})["verdict"])
+check("a row verified today is not reported as stale", 0,
+      sources.staleness({"verified": {"date": __import__("datetime").date.today().isoformat()}}))
+check("a row never verified has no age, rather than an age of zero", None,
+      sources.staleness({"verified": {}}))
 check("a keyed source is reported, not silently skipped", "needs-key",
       sources.check({"id": "x", "access": {"endpoint": "https://e", "key_required": True}})["verdict"])
 

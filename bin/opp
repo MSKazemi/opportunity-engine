@@ -540,8 +540,14 @@ def cmd_doctor(args) -> int:
     allsrc = sources.all_sources(registry)
     free = [s for s in allsrc if sources.is_free(s)]
     scannable = [s for s in allsrc if s["id"] in scan.SCANNABLE]
-    stale = [s for s in allsrc
-             if (sources.staleness(s) or 10**6) > sources.STALE_DAYS]
+    # `staleness` returns 0 for a row verified today, and `0 or default` is the
+    # default — which reported every freshly-checked source as stale. Never test
+    # a count for truthiness when zero is a meaningful answer.
+    def is_stale(source) -> bool:
+        age = sources.staleness(source)
+        return age is None or age > sources.STALE_DAYS
+
+    stale = [s for s in allsrc if is_stale(s)]
     print(f"sources:   {len(allsrc)} known · {len(free)} free · {len(scannable)} directly scannable")
     if stale:
         print(f"           {YELLOW}{len(stale)} row(s) unverified for over {sources.STALE_DAYS} days"
