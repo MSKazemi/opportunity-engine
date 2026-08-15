@@ -227,6 +227,32 @@ def _weworkremotely(payload: bytes, _: str = "") -> Iterator[dict]:
         }
 
 
+#: Values a feed emits when its own data is missing or its templating broke.
+#: Observed in the wild: Himalayas returns the literal string "name" as every
+#: employer when asked for more rows than it serves (correct at limit=20 and
+#: limit=100, junk at limit=120). A row like that is worse than no row — it looks
+#: real, it dedupes against nothing, and it teaches the matcher a company called
+#: "name" — so rows carrying one are dropped and counted, never stored.
+PLACEHOLDERS = {"name", "title", "company", "companyname", "company name", "n/a", "na",
+                "null", "none", "undefined", "unknown", "-", "--", "test", "example",
+                "string", "your company"}
+
+
+def plausible(row: dict) -> str:
+    """"" if the row looks like a real posting, else why it does not."""
+    title = (row.get("title") or "").strip()
+    org = (row.get("org") or "").strip()
+    if not title:
+        return "no title"
+    if title.lower() in PLACEHOLDERS:
+        return f"placeholder title {title!r}"
+    if org and org.lower() in PLACEHOLDERS:
+        return f"placeholder employer {org!r}"
+    if not row.get("url"):
+        return "no url to apply through"
+    return ""
+
+
 NORMALISERS: dict[str, Callable[..., Iterator[dict]]] = {
     "greenhouse": _greenhouse,
     "lever": _lever,
@@ -271,6 +297,11 @@ def scan_source(source_id: str, target: str | None = None, limit: int = 200,
                         "detail": "per-company board; pass --target <company-slug>"}
         for placeholder in ("{board}", "{company}", "{org}", "{account}"):
             endpoint = endpoint.replace(placeholder, target)
+    # Some feeds degrade above a row count they never document. Where one has
+    # been measured, ask for what it actually serves.
+    cap = access.get("max_rows")
+    if cap:
+        limit = min(limit, int(cap))
     endpoint = (endpoint.replace("{n}", str(limit))
                         .replace("{geo}", "").replace("{industry}", ""))
 
@@ -284,9 +315,19 @@ def scan_source(source_id: str, target: str | None = None, limit: int = 200,
         payload: Any = body if source_id == "weworkremotely" else json.loads(body)
         # islice, not list(...)[:limit] — these feeds carry thousands of rows and
         # cleaning the HTML of every one before throwing most away costs minutes.
-        rows = list(islice((r for r in normalise(payload, target or "") if r.get("title")),
-                           limit))
+        candidates = list(islice(normalise(payload, target or ""), limit))
     except (json.JSONDecodeError, ET.ParseError, KeyError, TypeError) as err:
         return [], {**report, "status": "unparsable", "http": status,
                     "detail": f"{type(err).__name__}: {err}"}
-    return rows, {**report, "status": "ok", "http": status, "fetched": len(rows)}
+
+    rows, rejected = [], []
+    for row in candidates:
+        reason = plausible(row)
+        (rejected if reason else rows).append(reason or row)
+
+    result = {**report, "status": "ok", "http": status, "fetched": len(rows)}
+    if rejected:
+        commonest = max(set(rejected), key=rejected.count)
+        result["rejected"] = len(rejected)
+        result["detail"] = f"{len(rejected)} dropped as implausible; most common: {commonest}"
+    return rows, result

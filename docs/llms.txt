@@ -36,7 +36,7 @@ The candidate profile is JSON Resume; opportunities are stored in schema.org/Job
 - Storage: a local SQLite file in a workspace directory you own; nothing is uploaded anywhere
 - Sources: 27 recorded, 13 verified live by HTTP request on 2026-08-15
 - Cost: every enabled source is usable with no card attached; paid sources are recorded and flagged
-- Self-test: 40 checks that need no network, no API key and no account
+- Self-test: 90 checks that need no network, no API key and no account
 
 ## Commands
 

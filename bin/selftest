@@ -24,7 +24,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "libexec"))
 
-from oe import paths, scan, sources, store  # noqa: E402
+from oe import ingest, match, paths, profile as profile_mod, scan, sources, store  # noqa: E402
 
 FIXTURES = REPO / "tests" / "fixtures"
 GREEN, RED, YELLOW, OFF = "\033[32m", "\033[31m", "\033[33m", "\033[0m"
@@ -199,6 +199,160 @@ rows, report = scan.scan_source("not-a-real-source")
 check("an unknown source is named, not ignored", "unknown-source", report["status"])
 rows, report = scan.scan_source("linkedin")
 check("a source with no key-free feed says why", "not-scannable", report["status"])
+
+# --------------------------------------------------------------------------- #
+group("row plausibility (a bad row is worse than no row)")
+
+check("a placeholder employer is rejected", "placeholder employer 'name'",
+      scan.plausible({"title": "Senior SRE", "org": "name", "url": "https://e/1"}))
+check("a real row passes", "",
+      scan.plausible({"title": "Senior SRE", "org": "ACME", "url": "https://e/1"}))
+check("a row with no title is rejected", "no title",
+      scan.plausible({"title": "", "org": "ACME", "url": "https://e/1"}))
+check("a row with no apply url is rejected", "no url to apply through",
+      scan.plausible({"title": "Senior SRE", "org": "ACME", "url": ""}))
+check("an empty employer is tolerated (some feeds omit it)", "",
+      scan.plausible({"title": "Senior SRE", "org": "", "url": "https://e/1"}))
+
+# --------------------------------------------------------------------------- #
+group("profile")
+
+prof = json.loads((REPO / "examples" / "profile" / "profile.example.json").read_text())
+check("the example profile has no blocking gaps", [], profile_mod.gaps(prof))
+check("skill terms are extracted", True, len(profile_mod.skill_terms(prof)) > 40)
+check("evidence is traceable to a place", True,
+      all(where for where, _ in profile_mod.evidence_corpus(prof)))
+
+pubs = list(profile_mod._publications(prof))
+check("published work is found however it was nested", True, len(pubs) > 5)
+nested = {"publications": {"journals": {"publishedOrAccepted": [{"name": "real"}],
+                                        "underReview": [{"name": "not yet"}],
+                                        "inPreparation": [{"name": "no"}]}}}
+check("'under review' is never counted as a publication", ["real"],
+      [p["name"] for p in profile_mod._publications(nested)])
+
+a = {"basics": {"name": "A", "email": "a@e"}, "skills": [{"name": "k8s"}]}
+b = {"basics": {"name": "B", "phone": "123"}, "skills": [{"name": "k8s"}, {"name": "aws"}]}
+merged = profile_mod.merge(a, b, source="second.json")
+check("a later document never overwrites an earlier value", "A", merged["basics"]["name"])
+check("a new field is still added", "123", merged["basics"]["phone"])
+check("lists merge without duplicating", 2, len(merged["skills"]))
+check("a disagreement is recorded, not silently resolved", True,
+      any("basics.name" in c for c in merged["meta"]["conflicts"]))
+check("every contributing document is recorded", ["second.json"], merged["meta"]["sources"])
+
+# --------------------------------------------------------------------------- #
+group("ingest")
+
+with tempfile.TemporaryDirectory() as tmp:
+    tmpdir = Path(tmp)
+    (tmpdir / "r.json").write_text(json.dumps(
+        {"basics": {"name": "X", "email": "x@e"}, "work": [{"name": "ACME"}]}))
+    fragment, report = ingest.ingest_file(tmpdir / "r.json")
+    check("JSON Resume is recognised", "json-resume", report["kind"])
+
+    (tmpdir / "li.json").write_text(json.dumps(
+        {"firstName": "A", "lastName": "B", "headline": "SRE",
+         "positions": [{"companyName": "ACME", "title": "SRE", "startedOn": "2020-01"}],
+         "skills": [{"name": "kubernetes"}]}))
+    fragment, report = ingest.ingest_file(tmpdir / "li.json")
+    check("a LinkedIn export is recognised", "linkedin-export", report["kind"])
+    check("LinkedIn positions become work entries", "ACME", fragment["work"][0]["name"])
+    check("and it warns that form answers are still missing", True,
+          any("work authorization" in t for t in report["todo"]))
+
+    (tmpdir / "cv.tex").write_text(
+        r"\section{Contact} \href{https://github.com/me}{GitHub} me@example.com "
+        r"\textbf{ORCID} 0000-0002-1166-6559")
+    fragment, report = ingest.ingest_file(tmpdir / "cv.tex")
+    check("latex is read as text", "latex", report["kind"])
+    check("an email is extracted", "me@example.com", fragment["basics"]["email"])
+    networks = {p["network"] for p in fragment["basics"]["profiles"]}
+    check("known profile links are recognised", True, {"GitHub", "ORCID"} <= networks)
+    check("roles are NEVER inferred from prose", True,
+          any("were NOT inferred" in t for t in report["todo"]))
+
+    (tmpdir / "cv.txt").write_text("Just some words about my career.")
+    fragment, _ = ingest.ingest_file(tmpdir / "cv.txt")
+    check("text with no contact details invents none", {}, fragment.get("basics", {}))
+
+prompt = ingest.agent_prompt(prof)
+check("the agent prompt forbids invention", True, "Invent nothing" in prompt)
+check("the agent prompt forbids copying private identifiers", True,
+      "date of birth" in prompt.lower())
+
+# --------------------------------------------------------------------------- #
+group("matching")
+
+LEX = match.lexicon()
+POSTING = {
+    "id": "t1", "title": "Senior MLOps Engineer", "org": "ACME", "url": "https://e/1",
+    "location": "Berlin, Germany", "posted_at": "2026-08-15",
+    "description": """About us. We do things.
+Requirements:
+- 5+ years with Kubernetes in production
+- Strong Python
+- Experience with Prometheus and Grafana
+- PhD or MSc in a technical field
+Nice to have:
+- Rust
+- Terraform
+""",
+}
+reqs = match.extract_requirements(POSTING, LEX)
+check("required bullets are separated from nice-to-have", True,
+      "kubernetes" in reqs["required_terms"] and "rust" not in reqs["required_terms"])
+check("a nice-to-have is recorded as optional", True, "rust" in reqs["optional_terms"])
+check("years demanded are read", 5, reqs["years_demanded"])
+check("degree demands are read", True, "phd" in reqs["degrees"])
+check("seniority is read from the title", ["senior"], reqs["seniority"])
+check("a real requirements section is high confidence", "high", reqs["confidence"])
+
+report = match.match(prof, POSTING, {"languages": ["english"]}, LEX)
+check("a real match is scorable", True, report["fit"] is not None)
+check("evidence is graded per requirement", True,
+      all(g["grade"] in ("proven", "claimed", "absent") for g in report["stage2_evidence"]["graded"]))
+check("every 'proven' grade carries the line that proves it", True,
+      all(g["evidence"] for g in report["stage2_evidence"]["graded"] if g["grade"] == "proven"))
+
+thin = {**POSTING, "title": "Account Manager", "description": "Talk to customers. Python helps."}
+thin_report = match.match(prof, thin, {"languages": ["english"]}, LEX)
+check("a posting with too few stated requirements is not scored", "unscorable",
+      thin_report["verdict"])
+check("and it says why rather than scoring 100%", True,
+      "too few to judge" in thin_report["advice"][0])
+
+unrelated = {**POSTING, "title": "Account Manager"}
+align, _ = match.title_alignment(prof, unrelated)
+check("an unrelated title scores zero alignment", 0.0, align)
+align2, _ = match.title_alignment(prof, POSTING)
+check("a matching title scores above zero", True, align2 > 0)
+
+blocked = match.match(prof, {**POSTING, "description": POSTING["description"] +
+                             "\nA security clearance is required."},
+                      {"languages": ["english"], "no_clearance": True}, LEX)
+check("a clearance requirement knocks the role out", "knocked-out", blocked["verdict"])
+check("a knockout names the rule that caused it", True,
+      bool(blocked["knockouts"][0]["source"]))
+
+lang_blocked = match.match(prof, {**POSTING, "description": POSTING["description"] +
+                                  "\n- Fluent German required"},
+                           {"languages": ["english"]}, LEX)
+check("a language you did not list knocks the role out", "knocked-out", lang_blocked["verdict"])
+
+check("a skill inside a group name still counts as claimed", True,
+      any(g["term"] == "kubernetes" and g["grade"] in ("proven", "claimed")
+          for g in report["stage2_evidence"]["graded"]))
+
+for text, expected in (("Fri, 15 Aug 2026 09:00:00 +0000", 2026),
+                       ("2026-08-10T12:00:00", 2026), ("2026-08-01", 2026),
+                       ("1786757871", 2026)):
+    parsed = match.parse_date(text)
+    check(f"date parsed: {text[:28]}", expected, parsed.year if parsed else None)
+check("an unparseable date is None, never 'today'", None, match.parse_date("nonsense"))
+check("an unknown age does not fake urgency", 1.0, match.freshness(None)[0])
+check("a fresh posting ranks above a stale one", True,
+      match.freshness("2026-08-15")[0] > match.freshness("2026-01-01")[0])
 
 # --------------------------------------------------------------------------- #
 group("network")

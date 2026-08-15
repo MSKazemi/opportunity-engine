@@ -1,0 +1,539 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jsonresume/resume-schema/v1.0.0/schema.json",
+  "basics": {
+    "name": "Mohsen Seyedkazemi Ardebili",
+    "label": "Research Engineer — MLOps · AIOps · LLM Agents · HPC",
+    "email": "mohsen.seyedkazemi@gmail.com",
+    "phone": "«redacted — kept in your own records, never in a file tools read»",
+    "url": "https://www.unibo.it/sitoweb/mohsen.seyedkazemi/en",
+    "summary": "Mohsen Seyedkazemi Ardebili builds and operates AI infrastructure for Kubernetes and HPC systems in production. He designs the MLOps, observability and anomaly-detection platforms that keep large HPC and cloud-native clusters reliable - currently as UNIBO technical lead for MLOps and AI production in SEANERGYS (EuroHPC Joint Undertaking), and as the author of KubeIntellect, an LLM-orchestrated framework for end-to-end Kubernetes management, and AOBench, a benchmark for tool-using AI agents in HPC. He is a Postdoctoral Research Fellow at the Department of Electrical, Electronic, and Information Engineering (DEI), University of Bologna, has contributed to five EU projects (REGALE, DECICE, Graph-Massivizer, European PILOT, SEANERGYS), co-supervises two Ph.D. students and has co-supervised five M.Sc. theses. Before academia he accumulated over seven years of enterprise IT and network infrastructure experience, including as IT & Network Administrator at a 1,000+ MW combined-cycle power plant in Iran.",
+    "location": {
+      "city": "Bologna",
+      "countryCode": "IT",
+      "address": "«redacted — kept in your own records, never in a file tools read»",
+      "postalCode": "«redacted — kept in your own records, never in a file tools read»"
+    },
+    "profiles": [
+      {
+        "network": "GitHub",
+        "username": "MSKazemi",
+        "url": "https://github.com/MSKazemi"
+      },
+      {
+        "network": "LinkedIn",
+        "username": "mskazemi",
+        "url": "https://www.linkedin.com/in/mskazemi/"
+      },
+      {
+        "network": "Google Scholar",
+        "username": "xP64pZsAAAAJ",
+        "url": "https://scholar.google.com/citations?user=xP64pZsAAAAJ"
+      },
+      {
+        "network": "ORCID",
+        "username": "0000-0002-1166-6559",
+        "url": "https://orcid.org/0000-0002-1166-6559"
+      }
+    ]
+  },
+  "work": [
+    {
+      "name": "University of Bologna (DEI)",
+      "position": "Postdoctoral Research Fellow",
+      "location": "Bologna, Italy",
+      "startDate": "2022-08",
+      "summary": "Designs autonomous AI systems for cloud-native and HPC environments; leads AI production platform design in SEANERGYS, a EuroHPC Joint Undertaking project (Horizon Europe, call HORIZON-EUROHPC-JU-2023-ENERGY-04; EUR 32.9M, 16 partners, 2025-06 to 2029-05).",
+      "highlights": [
+        "KubeIntellect — LLM-Orchestrated Multi-Agent Framework for Kubernetes: architected a modular multi-agent system translating natural-language requests into safe, auditable Kubernetes actions across the full API surface (RBAC, exec/proxy, scaling, lifecycle, security).",
+        "KubeIntellect: LangGraph FSM supervisor with PostgreSQL checkpoints, human-in-the-loop approval on all mutating operations, and a Code-Generator agent for dynamic tool synthesis and runtime registration; FastAPI + OpenAI-compatible backend, LibreChat UI, SSH-tunnelled Kubernetes layer with RBAC enforcement and audit logging.",
+        "KubeIntellect deployed and operated on Azure AKS (Terraform, NGINX Ingress, Grafana), with the system's evaluation published in the Journal of Grid Computing (kubeintellect.com). NOTE: the paper's evaluation figures are deliberately omitted here - application documents describe capability qualitatively and never frame a paper result as a production guarantee (see projects/kubeintellect/growth/CLAIMS.md).",
+        "AOBench — First LLM Agent Benchmark for HPC Operations: 80 tasks, 5 user roles, 10 task categories, 3 difficulty tiers; 23 fidelity-validated snapshots (SLURM, Prometheus, energy APIs); Completion-under-Policy (CuP) scorer hard-fails any RBAC violation.",
+        "AOBench: evaluated 16 systems (GPT-4o to 253B open-source); best ≈45% — no system is deployment-ready (github.com/MSKazemi/aobench).",
+        "SEANERGYS (UNIBO lead): designed ExaMLOps — Prefect training pipelines, MLflow lifecycle, Ray Serve multi-model inference, Prometheus/Grafana/Loki/Tempo observability, REST + CLI (exa) + LLM natural-language control.",
+        "DECICE (UNIBO lead): led the Dynamic Digital Twin task (T2.1) — real-time modelling across device→edge→cloud→HPC with Prometheus telemetry; foundation for the project's AI Scheduler.",
+        "Anomaly detection for Tier-0 HPC (GRAAFE, ThermADNet, HazardNet): F1 up to 0.99, AUC up to 0.91; <0.2% CPU overhead at 49-rack scale (~1000 nodes).",
+        "AIOps/MLOps pipelines: Kubeflow, MLflow, Prometheus, Grafana — continuous training, deployment, and monitoring in production."
+      ]
+    },
+    {
+      "name": "Sabalan Combined-Cycle Power Plant (1000–1440 MW)",
+      "position": "IT & Network Administrator",
+      "location": "Ardabil, Iran",
+      "startDate": "2009-04",
+      "endDate": "2015-08",
+      "summary": "Full responsibility for the facility's enterprise IT and networking infrastructure across eleven operational zones (distinct from the industrial process-control and PLC systems managed by a separate engineering division).",
+      "highlights": [
+        "Network infrastructure: design, deployment, and management of a fibre-optic campus backbone interconnecting eleven operational zones; managed switches, racks, and structured cabling.",
+        "Central server room: Windows Server, Active Directory (user/group/policy), Microsoft Exchange Server, DNS, DHCP, file/print services; UTM firewall, Internet access, and VPN for remote and inter-site connectivity.",
+        "Virtualisation: design and operation of a VMware vSphere/ESXi platform for server consolidation and resource management.",
+        "Enterprise application servers: project management, store management, human resources, and document management systems.",
+        "IT security and continuity: security policies, monitoring, backup procedures, and disaster-recovery plans for all IT systems."
+      ]
+    },
+    {
+      "name": "Mana Rayan Dorsa (Private Ltd.)",
+      "position": "Co-Founder (part-time)",
+      "location": "Ardabil, Iran",
+      "startDate": "2012-10",
+      "endDate": "2015-07",
+      "summary": "IT services company delivering network infrastructure, web hosting, and system integration for 50+ industrial and commercial clients.",
+      "highlights": [
+        "Managed Linux/Apache web stacks and enterprise LAN/WAN networks for 50+ industrial clients, alongside the main power-plant role."
+      ]
+    },
+    {
+      "name": "ASACO (Private Ltd.)",
+      "position": "IT & Network Engineer",
+      "location": "Ardabil, Iran",
+      "startDate": "2006-11",
+      "endDate": "2009-05",
+      "summary": "Administered Windows Server environments and configured enterprise LAN/WAN networks for enterprise clients.",
+      "highlights": [
+        "Windows Server (Active Directory, DHCP, DNS), LAN/WAN with switches, routers, and firewalls; network performance monitoring and security-policy management across distributed environments."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "institution": "University of Bologna (DEI)",
+      "location": "Bologna, Italy",
+      "area": "Electronics, Telecommunications, and Information Technology",
+      "studyType": "Ph.D.",
+      "startDate": "2018-11",
+      "endDate": "2022-07",
+      "researchTopic": "Design, Analysis, and Management of High-Performance Computing Systems"
+    },
+    {
+      "institution": "University of Bologna (DEI)",
+      "location": "Bologna, Italy",
+      "area": "Telecommunications Engineering",
+      "studyType": "M.Sc.",
+      "startDate": "2015-09",
+      "endDate": "2018-10"
+    },
+    {
+      "institution": "Islamic Azad University, Ardabil",
+      "location": "Ardabil, Iran",
+      "area": "Electrical Engineering",
+      "studyType": "B.Sc.",
+      "startDate": "2002-09",
+      "endDate": "2006-11"
+    }
+  ],
+  "skills": [
+    {
+      "name": "AI, Machine Learning, and Agentic Systems",
+      "keywords": [
+        "Python",
+        "PyTorch",
+        "TensorFlow",
+        "Scikit-learn",
+        "Pandas",
+        "Anomaly detection (deep learning, graph ML, statistical methods)",
+        "LLM tool orchestration",
+        "Dynamic tool synthesis",
+        "FastAPI"
+      ]
+    },
+    {
+      "name": "Multi-Agent Systems and Agentic Protocols",
+      "keywords": [
+        "Supervisor–worker orchestration",
+        "LangGraph stateful graphs",
+        "Domain-specialised agents",
+        "ReAct reasoning loops",
+        "Runtime-resolved conditional execution graphs",
+        "Human-in-the-loop (HITL) confirmation",
+        "Dynamic tool synthesis",
+        "AST-based validation",
+        "Runtime tool registration",
+        "Model Context Protocol (MCP) server/client",
+        "Agent-to-agent (A2A) protocol",
+        "Memory orchestration",
+        "LangChain",
+        "Google Agent Development Kit (ADK)",
+        "Anthropic SDK (Claude API)",
+        "OpenAI API"
+      ]
+    },
+    {
+      "name": "MLOps and AI Production",
+      "keywords": [
+        "Prefect",
+        "MLflow",
+        "Kubeflow",
+        "Ray Serve",
+        "Ray Train (distributed training)",
+        "KServe",
+        "vLLM",
+        "Red Hat OpenShift AI",
+        "MinIO",
+        "DVC",
+        "Model lifecycle (training, versioning, serving, drift detection, metric-gated promotion)",
+        "GitLab CI/CD",
+        "GitHub Actions",
+        "Model deployment across HPC and Kubernetes"
+      ]
+    },
+    {
+      "name": "Observability and Data Systems",
+      "keywords": [
+        "Prometheus",
+        "Grafana",
+        "Loki",
+        "Tempo",
+        "Alertmanager",
+        "OpenTelemetry",
+        "Time-series telemetry analysis",
+        "PySpark",
+        "Dask"
+      ]
+    },
+    {
+      "name": "Cloud-Native and Infrastructure",
+      "keywords": [
+        "Kubernetes",
+        "OpenShift",
+        "Helm",
+        "Terraform",
+        "Docker",
+        "Azure AKS",
+        "NGINX Ingress",
+        "Linux",
+        "Bash",
+        "Git"
+      ]
+    },
+    {
+      "name": "HPC and Parallel Computing",
+      "keywords": [
+        "SLURM",
+        "MPI",
+        "OpenMP",
+        "HPC telemetry and workload traces",
+        "Power and thermal modelling",
+        "Workload scheduling"
+      ]
+    },
+    {
+      "name": "Networking and System Administration",
+      "keywords": [
+        "Windows Server",
+        "Active Directory",
+        "DNS",
+        "DHCP",
+        "Microsoft Exchange Server",
+        "UTM firewalls",
+        "VPN",
+        "LAN/WAN",
+        "VLANs",
+        "Fibre-optic campus networks",
+        "VMware vSphere/ESXi",
+        "Cisco networking",
+        "SDN",
+        "IT security",
+        "Backup",
+        "Disaster recovery"
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "KubeIntellect",
+      "url": "https://kubeintellect.com/",
+      "repository": "https://github.com/MSKazemi/kubeintellect",
+      "description": "Operational modular LLM-orchestrated multi-agent framework for end-to-end Kubernetes management via adaptive orchestration. Domain-specialised agents (logging, metrics, configuration, security, lifecycle) coordinated by a stateful LangGraph supervisor, HITL confirmation on all mutating operations, and a Code Generator Agent that synthesises, validates, and registers novel Kubernetes tools at runtime across the full API surface (read, write, delete, exec, access control, lifecycle).",
+      "highlights": [
+        "In the paper evaluation, resolved 186/200 authored Kubernetes operations queries (93% query-resolution rate).",
+        "Runtime tool synthesis succeeded on 63/77 invocations in the reported evaluation (81.8% per-synthesis success). Never call this 93% - 93% is the overall query-resolution metric.",
+        "Passed 12/16 controlled fault-injection scenarios (75%) under the reported rubric.",
+        "+25 percentage-point improvement over a tool-less GPT-4o baseline in the same paper evaluation.",
+        "Peer-reviewed in the Journal of Grid Computing (2026).",
+        "Companion CLI kube-q exposes the full agent API with HITL approval UX (https://github.com/MSKazemi/kube_q)"
+      ]
+    },
+    {
+      "name": "AOBench (Agent Operations Benchmark for HPC) v0.2",
+      "url": "https://github.com/MSKazemi/aobench",
+      "repository": "https://github.com/MSKazemi/aobench",
+      "description": "Trace-driven, role-aware, RBAC-enforced benchmark for evaluating LLM agents in HPC facilities. 80 tasks across five HPC user roles and ten operational task categories (Job management, Monitoring, Energy, Performance, AIOps, Security, Architecture, Data, Documentation, Facility) at three difficulty tiers, grounded in 23 fidelity-validated deterministic environment snapshots exposing SLURM, Prometheus-style telemetry, and energy APIs.",
+      "highlights": [
+        "Completion-under-Policy (CuP) scorer hard-fails any run on an RBAC privilege violation",
+        "Results reported on the CLEAR five-dimension scorecard (Cost, Latency, Efficacy, Assurance, Reliability)",
+        "Evaluated 16 systems (GPT-4o, GPT-4o-mini, 13 open-source LLMs 7B–253B, zero-tool baseline); best ≈45% completion — no system deployment-ready"
+      ]
+    },
+    {
+      "name": "ExaMLOps (SEANERGYS)",
+      "description": "End-to-end MLOps platform for HPC workload management: model zoo for HPC workload prediction with auto-discovery training pipelines (Prefect), multi-stage lifecycle management (MLflow), and multi-model inference serving (Ray Serve, MinIO). Observability spans Prometheus/Grafana metrics, Loki logging, and Tempo tracing; operations exposed via a REST control plane, web dashboard with operator approval gate, an operator CLI (exa), and an LLM agent for natural-language control."
+    }
+  ],
+  "publications": [
+    {
+      "name": "KubeIntellect: A Modular LLM-Orchestrated Agent Framework for End-to-End Kubernetes Management",
+      "publisher": "Journal of Grid Computing",
+      "releaseDate": "2026",
+      "url": "10.1007/s10723-026-09837-6",
+      "_kind": "journal"
+    },
+    {
+      "name": "Elevating Datacenter Resilience with ThermADNet: A Thermal Anomaly Detection System",
+      "publisher": "Future Generation Computer Systems",
+      "releaseDate": "2026",
+      "url": "10.1016/j.future.2025.108311",
+      "_kind": "journal"
+    },
+    {
+      "name": "GRAAFE: GRaph Anomaly Anticipation Framework for Exascale HPC Systems",
+      "publisher": "Future Generation Computer Systems",
+      "releaseDate": "2024",
+      "url": "10.1016/j.future.2024.06.032",
+      "_kind": "journal"
+    },
+    {
+      "name": "HazardNet: A Thermal Hazard Prediction Framework for Datacenters",
+      "publisher": "Future Generation Computer Systems",
+      "releaseDate": "2024",
+      "url": "10.1016/j.future.2024.01.031",
+      "_kind": "journal"
+    },
+    {
+      "name": "M100 ExaData: A Data Collection Campaign on the CINECA's Marconi100 Tier-0 Supercomputer",
+      "publisher": "Nature Scientific Data",
+      "releaseDate": "2023",
+      "url": "10.1038/s41597-023-02174-3",
+      "_kind": "journal"
+    },
+    {
+      "name": "A Genetically Tuned Optimal PID Controller",
+      "publisher": "WSEAS Transactions on Systems and Control",
+      "releaseDate": "2007",
+      "url": "",
+      "_kind": "journal"
+    },
+    {
+      "name": "DECICE: AI-Driven Scheduling and Digital Twin Integration for the Cloud-HPC-Edge Compute Continuum",
+      "publisher": "Proc. of the RPE Special Session, IEEE COMPSAC 2026, Madrid, Spain",
+      "releaseDate": "2026",
+      "url": "",
+      "_kind": "conference"
+    },
+    {
+      "name": "Lightweight Scalable DevOps for Cloud Robotics",
+      "publisher": "Proc. of the 3rd Int. Workshop on Scalable Compute Continuum (WSCC 2025), co-located with Euro-Par 2025, Dresden, Germany",
+      "releaseDate": "2025",
+      "url": "",
+      "_kind": "conference"
+    },
+    {
+      "name": "Design and Implementation of Integrated AI Scheduler for Dynamic Cloud Workloads Allocation in Kubernetes Environments",
+      "publisher": "Proc. of the Future Technologies Conference (FTC 2025), Munich, Germany",
+      "releaseDate": "2025",
+      "url": "10.1007/978-3-032-07986-2_25",
+      "_kind": "conference"
+    },
+    {
+      "name": "PM100: A Job Power Consumption Dataset of a Large-scale Production HPC System",
+      "publisher": "Proc. of the SC'23 Workshops of The International Conference on High Performance Computing, Network, Storage, and Analysis",
+      "releaseDate": "2023",
+      "url": "10.1145/3624062.3624263",
+      "_kind": "conference"
+    },
+    {
+      "name": "Multi-level Anomaly Prediction in Tier-0 Datacenter: A Deep Learning Approach",
+      "publisher": "Proc. of the 19th ACM International Conference on Computing Frontiers",
+      "releaseDate": "2022",
+      "url": "10.1145/3528416.3530864",
+      "_kind": "conference"
+    },
+    {
+      "name": "Rule-based Thermal Anomaly Detection for Tier-0 HPC Systems",
+      "publisher": "3rd ISC HPC International Workshop on Monitoring and Operational Data Analytics",
+      "releaseDate": "2022",
+      "url": "10.1007/978-3-031-23220-6_18",
+      "_kind": "conference"
+    },
+    {
+      "name": "Prediction of Thermal Hazards in a Real Datacenter Room Using Temporal Convolutional Networks",
+      "publisher": "Design, Automation and Test in Europe Conference and Exhibition (DATE 2021), IEEE",
+      "releaseDate": "2021",
+      "url": "10.23919/date51398.2021.9474116",
+      "_kind": "conference"
+    },
+    {
+      "name": "Thermal Characterization of a Tier-0 Datacenter Room in Normal and Thermal Emergency Conditions",
+      "publisher": "High Performance Computing in Science and Engineering 2019, Ostrava, Czech Republic",
+      "releaseDate": "2019",
+      "url": "10.1007/978-3-030-67077-1_1",
+      "_kind": "conference"
+    },
+    {
+      "name": "Floating Entanglement Witness Measure and Genetic Algorithm",
+      "publisher": "International Iran Conference on Quantum Information, Sharif University of Technology, Tehran, Iran",
+      "releaseDate": "2012",
+      "url": "",
+      "_kind": "conference"
+    },
+    {
+      "name": "Designing Optimal PID Controller with Genetic Algorithm in View of Controller Location in the Plant",
+      "publisher": "7th International Conference on Signal Processing, Robotics and Automation, Cambridge, UK",
+      "releaseDate": "2008",
+      "url": "",
+      "_kind": "conference"
+    },
+    {
+      "name": "Genetic Algorithm Application to Control of STATCOM for Damping of Subsynchronous Resonance",
+      "publisher": "7th WSEAS International Conference on Power Systems (PE'07), Beijing, China",
+      "releaseDate": "2007",
+      "url": "",
+      "_kind": "conference"
+    }
+  ],
+  "languages": [
+    {
+      "language": "English",
+      "fluency": "Professional working proficiency"
+    },
+    {
+      "language": "Italian",
+      "fluency": "Elementary (A2)"
+    },
+    {
+      "language": "Persian (Farsi)",
+      "fluency": "Native"
+    },
+    {
+      "language": "Azerbaijani",
+      "fluency": "Native"
+    },
+    {
+      "language": "Turkish",
+      "fluency": "Native"
+    }
+  ],
+  "certificates": [
+    {
+      "name": "Claude Code in Action",
+      "issuer": "Anthropic",
+      "date": "2026"
+    },
+    {
+      "name": "Introduction to Quantum Computing",
+      "issuer": "CINECA",
+      "date": "2023"
+    },
+    {
+      "name": "Containerization in HPC",
+      "issuer": "CINECA",
+      "date": "2022"
+    },
+    {
+      "name": "Practical Deep Learning for HPC",
+      "issuer": "PRACE",
+      "date": "2022"
+    },
+    {
+      "name": "Machine Learning with AMD GPUs & ROCm",
+      "issuer": "HLRS, University of Stuttgart",
+      "date": "2021"
+    },
+    {
+      "name": "Advanced Parallel Computing",
+      "issuer": "CINECA",
+      "date": "2021"
+    },
+    {
+      "name": "Parallel Programming with MPI / OpenMP",
+      "issuer": "ETH Zurich / HLRS",
+      "date": "2020"
+    },
+    {
+      "name": "Neural Networks and Deep Learning",
+      "issuer": "deeplearning.ai / Coursera",
+      "date": "2019"
+    },
+    {
+      "name": "Energy Efficiency in HPC",
+      "issuer": "CINECA",
+      "date": "2019"
+    },
+    {
+      "name": "Certified Ethical Hacker (CEH)",
+      "issuer": "EC-Council",
+      "date": "2013"
+    }
+  ],
+  "application": {
+    "_note": "This block is why nothing is ever retyped. Values here answer the fields application forms demand. Private identifiers are redacted in this example.",
+    "personal": {
+      "fullName": "Mohsen Seyedkazemi Ardebili",
+      "email": "mohsen.seyedkazemi@gmail.com",
+      "dateOfBirth": "«redacted — kept in your own records, never in a file tools read»",
+      "placeOfBirth": "«redacted — kept in your own records, never in a file tools read»",
+      "nationality": "«your nationality»"
+    },
+    "workAuthorization": {
+      "status": "EU Long-Term Resident permit (Italy)",
+      "euRightToWork": true,
+      "requiresSponsorshipEU": false,
+      "summary": "Authorised to work in Italy and the EU; no sponsorship required.",
+      "permitNumber": "«redacted — kept in your own records, never in a file tools read»"
+    },
+    "preferences": {
+      "remotePreference": "Remote-first, worldwide. No location restriction for remote work.",
+      "regionPriority": [
+        "1 - Bologna, Italy (home city)",
+        "2 - Italy (remote or hybrid)",
+        "3 - Europe / EU (remote)",
+        "4 - Worldwide remote, including China and Asia"
+      ],
+      "employmentTypes": [
+        "full-time",
+        "part-time",
+        "contract",
+        "freelance"
+      ],
+      "relocation": "Primarily remote; open to discussing relocation for an exceptional role.",
+      "noticePeriod": "1 month",
+      "availability": "Available for interviews immediately; can start within 1 month of accepting an offer."
+    },
+    "compensation": {
+      "currency": "EUR",
+      "note": "«your range — kept out of this public example on purpose»"
+    },
+    "languages": {
+      "english": "professional",
+      "italian": "A2",
+      "persian": "native"
+    },
+    "skillYearsOfExperience": {
+      "python": 7,
+      "pytorch": 6,
+      "tensorflow": 4,
+      "kubernetes": 6,
+      "llm": 3,
+      "ai_agents": 3,
+      "sql": 3,
+      "cloud_azure": 5,
+      "overall_professional": 7
+    },
+    "educationSummary": {
+      "highestDegree": "PhD",
+      "hasMasterOrHigher": true,
+      "hasBachelorOrHigher": true
+    },
+    "screeningAnswers": {
+      "_note": "Long-form answers you reuse. Redacted in this example."
+    },
+    "rules": {
+      "ethicalExclusions": "«your own exclusions — see .opp/config.json»"
+    }
+  },
+  "meta": {
+    "generator": "opportunity-engine",
+    "note": "Example profile. Real public-CV facts (roles, degrees, skills, publications) so the matcher can be demonstrated against something true. Every private identifier — home address, phone, date and place of birth, permit number, salary — is redacted.",
+    "sources": [
+      "example"
+    ]
+  }
+}

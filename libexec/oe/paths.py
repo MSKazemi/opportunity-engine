@@ -56,3 +56,36 @@ def db_path(ws: Path | None = None) -> Path:
 
 def profile_path(ws: Path | None = None) -> Path:
     return (ws or find_workspace()) / "profile" / "profile.json"
+
+
+def config_path(ws: Path | None = None) -> Path:
+    return (ws or find_workspace()) / "config.json"
+
+
+#: The user's own hard rules. The tool has no opinion about which countries,
+#: sectors or contract forms anyone will work in — it only honours what the user
+#: declared here, and says which line of this file blocked something.
+DEFAULT_CONFIG = {
+    "_note": "Your rules. A match is knocked out — not merely penalised — when it hits one.",
+    "languages": ["english"],
+    "_languages": "Languages you can honestly claim. A posting demanding one you did not list is knocked out.",
+    "exclude_countries": [],
+    "_exclude_countries": "Substrings matched against a posting's location, e.g. ['united states'].",
+    "exclude_signals": [],
+    "_exclude_signals": "Any of: clearance, citizenship, residency, employment-form, sector.",
+    "no_clearance": True,
+    "_no_clearance": "Knock out roles requiring a security clearance you cannot obtain.",
+    "min_fit": 0.45,
+    "_min_fit": "Below this, `opp match --top` will not suggest applying."
+}
+
+
+def load_config(ws: Path | None = None) -> dict:
+    import json
+    target = config_path(ws)
+    if not target.exists():
+        return dict(DEFAULT_CONFIG)
+    try:
+        return {**DEFAULT_CONFIG, **json.loads(target.read_text())}
+    except ValueError:
+        return dict(DEFAULT_CONFIG)

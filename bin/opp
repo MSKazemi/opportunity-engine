@@ -22,7 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "libexec"))
 
-from oe import __version__, paths, scan, sources, store  # noqa: E402
+from oe import __version__, ingest, match, paths, profile as profile_mod, scan, sources, store  # noqa: E402
 
 GREEN, RED, YELLOW, DIM, OFF = "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[0m"
 
@@ -40,11 +40,184 @@ def cmd_init(args) -> int:
     print(f"workspace: {workspace}")
     store.connect(paths.db_path(workspace)).close()
     print(f"store:     {paths.db_path(workspace)}")
+
+    config = paths.config_path(workspace)
+    if not config.exists():
+        config.write_text(json.dumps(paths.DEFAULT_CONFIG, indent=2) + "\n")
+    print(f"rules:     {config}  {DIM}(your hard limits — nothing is assumed for you){OFF}")
     profile = paths.profile_path(workspace)
     if not profile.exists():
         print(f"\nNo profile yet. The engine can find work without one, but it cannot")
         print(f"match or apply. Create it from whatever you already have:")
         print(f"  opp ingest path/to/cv.pdf path/to/resume.json ...")
+    return 0
+
+
+def cmd_ingest(args) -> int:
+    workspace = paths.find_workspace()
+    if not workspace.exists():
+        print("no workspace here — run: opp init", file=sys.stderr)
+        return 2
+
+    existing = profile_mod.load()
+    base = existing if existing is not None else profile_mod.empty()
+    try:
+        merged, reports = ingest.ingest([Path(p) for p in args.files], base)
+    except ingest.IngestError as err:
+        print(f"ingest failed: {err}", file=sys.stderr)
+        return 2
+
+    for report in reports:
+        print(f"  {report['file']}  [{report['kind']}]")
+        for item in report["extracted"]:
+            print(f"      {GREEN}+{OFF} {item}")
+        for item in report["todo"]:
+            print(f"      {YELLOW}?{OFF} {item}")
+
+    where = profile_mod.save(merged)
+    print(f"\nprofile: {where}")
+
+    conflicts = merged.get("meta", {}).get("conflicts", [])
+    if conflicts:
+        print(f"{YELLOW}{len(conflicts)} conflict(s) — the first value was kept, nothing overwritten:{OFF}")
+        for line in conflicts[:5]:
+            print(f"  {line}")
+
+    remaining = profile_mod.gaps(merged)
+    if remaining:
+        print(f"\n{YELLOW}still missing before you can apply honestly:{OFF}")
+        for field, why in remaining:
+            print(f"  {field:<45} {DIM}{why}{OFF}")
+        print(f"\n{DIM}fill them in {where}, or: opp profile --agent{OFF}")
+    else:
+        print(f"\n{GREEN}complete enough to apply{OFF} · next: opp match --top 20")
+    return 0
+
+
+def cmd_profile(args) -> int:
+    loaded = profile_mod.load()
+    if loaded is None:
+        print("no profile yet — run: opp ingest <your cv and any json you have>", file=sys.stderr)
+        return 2
+    if args.agent:
+        print(ingest.agent_prompt(loaded))
+        return 0
+    if args.json:
+        print(json.dumps(loaded, indent=2, ensure_ascii=False))
+        return 0
+
+    info = profile_mod.summarise(loaded)
+    print(f"{info['name']}   {DIM}{info['label']}{OFF}")
+    print(f"  {info['roles']} role(s) · {info['skills']} skill group(s) · "
+          f"{info['projects']} project(s) · {info['publications']} publication(s)")
+    print(f"  {info['skill_terms']} claimable term(s) · {info['evidence_items']} evidence item(s)")
+    if info["sources"]:
+        print(f"  built from: {', '.join(Path(s).name for s in info['sources'])}")
+    if info["conflicts"]:
+        print(f"\n{YELLOW}conflicts (first value kept):{OFF}")
+        for line in info["conflicts"][:8]:
+            print(f"  {line}")
+    if info["gaps"]:
+        print(f"\n{YELLOW}gaps that block an application:{OFF}")
+        for field, why in info["gaps"]:
+            print(f"  {field:<45} {DIM}{why}{OFF}")
+    else:
+        print(f"\n{GREEN}no blocking gaps{OFF}")
+    return 0
+
+
+def _print_match(report: dict, verbose: bool) -> None:
+    colour = {"strong": GREEN, "plausible": YELLOW, "weak": DIM,
+              "knocked-out": RED, "unscorable": DIM}[report["verdict"]]
+    fit = "  – " if report["fit"] is None else f"{report['fit']:.2f}"
+    print(f"\n{colour}{report['verdict'].upper()}{OFF}  fit {fit}   {report['title']}")
+    print(f"  {report['org']}  ·  {report['url']}")
+
+    for block in report["knockouts"]:
+        print(f"  {RED}blocked{OFF}  {block['kind']}: {block['why']}  {DIM}({block['source']}){OFF}")
+
+    s1, s2 = report["stage1_parser"], report["stage2_evidence"]
+    if s1["score"] is not None:
+        print(f"  stage 1 (parser gate)   {s1['score']:.0%} of required terms present"
+              f"   {DIM}{len(s1['covered'])} covered, {len(s1['missing'])} missing{OFF}")
+    if s2["score"] is not None:
+        print(f"  stage 2 (ranking layer) {s2['score']:.0%} supported"
+              f"   {DIM}{s2['proven']} proven, {s2['claimed']} claimed only, {s2['absent']} absent{OFF}")
+
+    sentence = report["defensible_sentence"]
+    mark = f"{GREEN}✓{OFF}" if sentence["ok"] else f"{YELLOW}!{OFF}"
+    print(f"  {mark} categorisable: {DIM}{sentence['note']}{OFF}")
+
+    if verbose:
+        for graded in report["stage2_evidence"]["graded"]:
+            if graded["grade"] == "proven":
+                print(f"      {GREEN}proven{OFF}  {graded['term']:<22} {DIM}{graded['where']}: "
+                      f"{graded['evidence'][:90]}{OFF}")
+            elif graded["grade"] == "claimed":
+                print(f"      {YELLOW}claimed{OFF} {graded['term']:<22} {DIM}skills list only{OFF}")
+    for line in report["advice"]:
+        print(f"  → {line}")
+
+
+def cmd_match(args) -> int:
+    loaded = profile_mod.load()
+    if loaded is None:
+        print("no profile — run: opp ingest <files>", file=sys.stderr)
+        return 2
+    constraints = paths.load_config()
+    lex = match.lexicon()
+    con = store.connect(paths.db_path())
+
+    if args.id:
+        row = con.execute("SELECT * FROM opportunities WHERE id = ?", (args.id,)).fetchone()
+        if row is None:
+            print(f"no opportunity {args.id}", file=sys.stderr)
+            return 2
+        rows = [row]
+    else:
+        rows = list(con.execute(
+            "SELECT * FROM opportunities WHERE state IN ('new','screened') "
+            "ORDER BY posted_at DESC LIMIT ?", (args.scan_limit,)))
+
+    if not rows:
+        print("nothing to match — run: opp scan")
+        return 0
+
+    reports = []
+    for row in rows:
+        report = match.match(loaded, dict(row), constraints, lex)
+        reports.append(report)
+        con.execute(
+            "UPDATE opportunities SET score = ?, score_detail = ?, state = ?, "
+            "state_reason = ?, updated_at = ? WHERE id = ?",
+            (report["priority"], json.dumps(report, ensure_ascii=False)[:60000],
+             "rejected" if report["verdict"] == "knocked-out" else "screened",
+             (report["knockouts"][0]["why"] if report["knockouts"] else ""),
+             store.now(), row["id"]))
+        store.log(con, row["id"], "matched", report["verdict"])
+    con.commit()
+
+    ranked = sorted([r for r in reports if r["priority"] is not None],
+                    key=lambda r: r["priority"], reverse=True)
+    blocked = [r for r in reports if r["verdict"] == "knocked-out"]
+
+    if args.json:
+        print(json.dumps(ranked, indent=2, ensure_ascii=False))
+        con.close()
+        return 0
+
+    shown = [r for r in ranked if r["verdict"] != "knocked-out"][:args.top]
+    for report in shown:
+        _print_match(report, args.verbose)
+
+    worth = [r for r in shown if r["fit"] and r["fit"] >= constraints["min_fit"]]
+    print(f"\n{len(reports)} scored · {len(worth)} above your min_fit of "
+          f"{constraints['min_fit']} · {len(blocked)} knocked out")
+    if blocked and args.verbose:
+        print(f"\n{DIM}knocked out:{OFF}")
+        for report in blocked[:10]:
+            print(f"  {report['title'][:50]:<50} {report['knockouts'][0]['why']}")
+    con.close()
     return 0
 
 
@@ -151,9 +324,15 @@ def cmd_scan(args) -> int:
         con.commit()
 
         if report["status"] == "ok":
-            print(f"  {GREEN}ok{OFF}    {source_id:<16} {report['fetched']:>4} fetched  "
-                  f"{outcomes['new']:>4} new  {outcomes['duplicate']:>3} dup  "
-                  f"{outcomes['known']:>4} already seen")
+            line = (f"  {GREEN}ok{OFF}    {source_id:<16} {report['fetched']:>4} fetched  "
+                    f"{outcomes['new']:>4} new  {outcomes['duplicate']:>3} dup  "
+                    f"{outcomes['known']:>4} already seen")
+            if report.get("rejected"):
+                line += f"  {YELLOW}{report['rejected']} dropped{OFF}"
+            print(line)
+            # Never let a silent drop look like a quiet source.
+            if report.get("rejected"):
+                print(f"        {DIM}{report.get('detail', '')}{OFF}")
         else:
             print(f"  {RED}{report['status']}{OFF}  {source_id:<16} {report.get('detail', '')[:80]}")
 
@@ -254,6 +433,24 @@ def main() -> int:
     p = sub.add_parser("init", help="make a workspace here")
     p.add_argument("path", nargs="?")
     p.set_defaults(func=cmd_init)
+
+    p = sub.add_parser("ingest", help="fold a CV, a resume.json or any document into your profile")
+    p.add_argument("files", nargs="+")
+    p.set_defaults(func=cmd_ingest)
+
+    p = sub.add_parser("profile", help="what your profile can claim, and what is missing")
+    p.add_argument("--agent", action="store_true",
+                   help="print a prompt for a Claude session to complete it (no API call)")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_profile)
+
+    p = sub.add_parser("match", help="score opportunities against your profile, with evidence")
+    p.add_argument("--id", help="one opportunity")
+    p.add_argument("--top", type=int, default=10, help="how many to print")
+    p.add_argument("--scan-limit", type=int, default=300, help="how many to score")
+    p.add_argument("--verbose", "-v", action="store_true", help="show the evidence per requirement")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_match)
 
     p = sub.add_parser("sources", help="where opportunities can be found, and what each costs")
     p.add_argument("--free-only", action="store_true", help="only what needs no card")

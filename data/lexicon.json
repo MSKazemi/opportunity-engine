@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "note": "Terms a posting may demand, grouped so a match report can say WHICH KIND of gap it found. This is a recall aid, not a taxonomy: a term missing here is still caught when it appears in the user's own profile, and unmatched requirement lines are reported as 'not recognised' rather than silently dropped.",
+  "groups": {
+    "language-runtime": ["python", "java", "c++", "c#", "golang", "go", "rust", "typescript", "javascript", "scala", "kotlin", "ruby", "php", "swift", "r", "matlab", "fortran", "bash", "shell", "perl", "julia", "haskell", "elixir", "node.js", ".net"],
+    "ml-ai": ["machine learning", "deep learning", "pytorch", "tensorflow", "keras", "scikit-learn", "jax", "hugging face", "transformers", "llm", "large language model", "nlp", "natural language processing", "computer vision", "reinforcement learning", "generative ai", "rag", "retrieval augmented generation", "fine-tuning", "embeddings", "vector database", "prompt engineering", "ai agents", "agentic", "mlops", "model serving", "feature store", "xgboost", "pandas", "numpy", "anomaly detection", "time series", "forecasting", "recommender"],
+    "cloud": ["aws", "azure", "gcp", "google cloud", "openstack", "cloud-native", "serverless", "lambda", "s3", "ec2", "eks", "aks", "gke", "cloudformation", "iam"],
+    "platform-infra": ["kubernetes", "k8s", "docker", "containers", "helm", "terraform", "ansible", "puppet", "chef", "openshift", "istio", "service mesh", "ci/cd", "jenkins", "gitlab ci", "github actions", "argocd", "flux", "gitops", "linux", "unix", "networking", "sre", "site reliability", "infrastructure as code", "vagrant", "kvm", "libvirt", "systemd"],
+    "hpc": ["hpc", "high performance computing", "slurm", "mpi", "openmp", "cuda", "gpu", "parallel computing", "supercomputer", "infiniband", "lustre", "exascale", "numa", "job scheduler"],
+    "data": ["sql", "postgresql", "mysql", "mongodb", "redis", "elasticsearch", "kafka", "spark", "hadoop", "airflow", "dbt", "snowflake", "databricks", "clickhouse", "influxdb", "prometheus", "grafana", "opensearch", "etl", "data pipeline", "data engineering", "data warehouse", "timescaledb"],
+    "observability": ["observability", "monitoring", "logging", "tracing", "opentelemetry", "prometheus", "grafana", "datadog", "elk", "loki", "jaeger", "telemetry", "alerting", "slo", "sli"],
+    "web-api": ["rest", "graphql", "grpc", "api design", "microservices", "fastapi", "flask", "django", "spring", "react", "vue", "angular", "next.js", "websockets", "openapi"],
+    "practice": ["agile", "scrum", "kanban", "code review", "unit testing", "integration testing", "tdd", "pair programming", "technical writing", "documentation", "mentoring", "stakeholder management", "project management", "team lead", "architecture", "system design", "security", "devsecops", "compliance", "gdpr"],
+    "research": ["research", "publication", "peer review", "phd", "postdoc", "grant", "horizon europe", "conference", "journal", "benchmarking", "experimental design", "statistics"]
+  },
+  "seniority": {
+    "intern": ["intern", "internship", "working student", "werkstudent"],
+    "junior": ["junior", "entry level", "graduate", "entry-level"],
+    "mid": ["mid-level", "intermediate", "regular"],
+    "senior": ["senior", "sr.", "experienced"],
+    "staff": ["staff", "principal", "expert", "architect"],
+    "lead": ["lead", "leiter", "team lead", "tech lead", "engineering manager", "head of", "director", "vp ", "chief"]
+  },
+  "degree": {
+    "phd": ["phd", "ph.d", "doctorate", "doctoral", "dr.", "promotion"],
+    "msc": ["master", "msc", "m.sc", "diplom", "mba"],
+    "bsc": ["bachelor", "bsc", "b.sc", "undergraduate degree"]
+  },
+  "languages": {
+    "german": ["german", "deutsch", "deutschkenntnisse"],
+    "french": ["french", "français", "francais"],
+    "italian": ["italian", "italiano"],
+    "spanish": ["spanish", "español", "espanol"],
+    "dutch": ["dutch", "nederlands"],
+    "portuguese": ["portuguese"],
+    "chinese": ["chinese", "mandarin"],
+    "japanese": ["japanese"],
+    "arabic": ["arabic"],
+    "english": ["english"]
+  },
+  "language_levels": ["native", "mother tongue", "muttersprache", "fluent", "verhandlungssicher", "business fluent", "c2", "c1", "b2", "b1", "a2", "a1", "professional working proficiency"],
+  "knockout_signals": {
+    "clearance": ["security clearance", "sicherheitsüberprüfung", "sü2", "sü3", "nato clearance", "top secret", "public trust", "baseline personnel security"],
+    "citizenship": ["must be a citizen", "citizens only", "citizenship required", "eu citizenship required", "us citizen", "national of"],
+    "residency": ["must reside in", "must be located in", "residency requirement", "must live in", "relocation required", "on-site only", "onsite only", "no remote"],
+    "employment-form": ["nur angestellte", "no freelancers", "employees only", "arbeitnehmerüberlassung", "anü", "w2 only", "no c2c"],
+    "sector": ["defence", "defense", "military", "weapons", "munitions", "intelligence agency", "gambling", "casino", "betting", "adult content", "tobacco"]
+  },
+  "requirement_headings": ["requirements", "qualifications", "what you bring", "what you'll bring", "what you will bring", "your profile", "ihr profil", "we are looking for", "we're looking for", "who you are", "must have", "must-have", "minimum qualifications", "basic qualifications", "essential", "skills and experience", "your skills", "what we expect", "you have", "you should have", "anforderungen", "profil", "required skills", "what you need"],
+  "nice_to_have_headings": ["nice to have", "nice-to-have", "bonus", "preferred qualifications", "preferred", "plus", "desirable", "would be great", "wünschenswert", "von vorteil", "extra credit", "icing on the cake"]
+}

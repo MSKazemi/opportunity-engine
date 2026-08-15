@@ -131,7 +131,7 @@ want PDFs out of the CV generator.
 
 ## Status
 
-This is **v0.1**. What is real is marked real; nothing here is aspirational.
+This is **v0.2**. What is real is marked real; nothing here is aspirational.
 
 | Piece | State |
 |---|---|
@@ -140,8 +140,9 @@ This is **v0.1**. What is real is marked real; nothing here is aspirational.
 | Cross-source deduplication | **working** |
 | SQLite store, schema.org/JobPosting shaped | **working** |
 | `opp sources check` re-verification | **working** |
-| `opp ingest` — CV/JSON/text → one profile | next |
-| `opp match` — fit scoring with evidence, gap report | next |
+| `opp ingest` — CV/JSON/text → one profile, nothing inferred | **working** |
+| `opp profile` — what you can claim, and what is missing | **working** |
+| `opp match` — two-stage scoring, per-requirement evidence, knockouts | **working** |
 | `opp cv build` — tailored LaTeX → PDF | next |
 | `opp apply` — package assembly, human clears the walls | next |
 
@@ -178,7 +179,7 @@ Honest version, including where the others are the better choice.
 | Profile format | JSON Resume (portable) | proprietary | proprietary | varies |
 | Web dashboard / mobile app | **no** | yes | yes | no |
 | Auto-apply at volume | **deliberately not** | some | yes | no |
-| Match scoring | being built | yes, mature | yes | yes |
+| Match scoring, with per-requirement evidence | yes | yes, mature | yes | yes |
 
 If you want a polished hosted product with a dashboard and support, buy one of the others — they
 are good at that and this is not trying to be. Choose this if you want your career data on your own
