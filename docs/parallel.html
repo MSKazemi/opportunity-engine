@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parallel applying — opportunity-engine + agent-fleet architecture</title>
+<meta name="description" content="How opportunity-engine hands prepared application packages to agent-fleet: one VS Code window, several terminals, one Claude Code session each, and a private Chrome tab per session — with every worker stopping at the submit button.">
+<link rel="canonical" href="https://mskazemi.com/opportunity-engine/parallel.html">
+<meta name="author" content="Mohsen Seyedkazemi Ardebili">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Parallel applying — opportunity-engine + agent-fleet">
+<meta property="og:description" content="One VS Code window, N terminals, N Claude sessions, N private Chrome tabs — and a human gate before anything is sent.">
+<meta property="og:url" content="https://mskazemi.com/opportunity-engine/parallel.html">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Parallel applying — opportunity-engine + agent-fleet">
+<meta name="twitter:description" content="One VS Code window, N terminals, N Claude sessions, N private Chrome tabs — and a human gate before anything is sent.">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "Parallel applying — opportunity-engine + agent-fleet architecture",
+  "description": "How prepared application packages are handed to a fleet of parallel Claude Code sessions, each driving its own Chrome tab, with a human approval gate before submission.",
+  "url": "https://mskazemi.com/opportunity-engine/parallel.html",
+  "author": { "@type": "Person", "name": "Mohsen Seyedkazemi Ardebili", "url": "https://mskazemi.com" },
+  "isPartOf": { "@type": "SoftwareSourceCode", "name": "opportunity-engine", "codeRepository": "https://github.com/MSKazemi/opportunity-engine" }
+}
+</script>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #14181d; --dim: #5b6672; --line: #e2e6ea;
+    --accent: #1f6f5c; --code-bg: #f5f7f8; --card: #fafbfc;
+    --warn: #b4690e; --stop: #b03030; --flow: #1f6f5c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1216; --fg: #e8edf2; --dim: #9aa7b4; --line: #232a32;
+      --accent: #4fbfa0; --code-bg: #161b21; --card: #141920;
+      --warn: #e0a458; --stop: #e07070; --flow: #4fbfa0;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1216; --fg: #e8edf2; --dim: #9aa7b4; --line: #232a32;
+    --accent: #4fbfa0; --code-bg: #161b21; --card: #141920;
+    --warn: #e0a458; --stop: #e07070; --flow: #4fbfa0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 62rem; margin: 0 auto; padding: 0 1.25rem; }
+  header { border-bottom: 1px solid var(--line); padding: 3rem 0 2rem; }
+  h1 { font-size: clamp(1.7rem, 4.5vw, 2.6rem); margin: 0 0 .5rem; letter-spacing: -.02em; }
+  h1 .dim { color: var(--dim); font-weight: 400; }
+  h2 { font-size: clamp(1.25rem, 3vw, 1.6rem); margin: 2.75rem 0 .75rem; letter-spacing: -.01em; }
+  h3 { font-size: 1.05rem; margin: 1.5rem 0 .4rem; }
+  p.lead { font-size: 1.12rem; color: var(--dim); margin: 0 0 1.25rem; max-width: 46rem; }
+  a { color: var(--accent); }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+    padding: 1rem; overflow-x: auto; font-size: .875rem; line-height: 1.55;
+  }
+  code { background: var(--code-bg); padding: .12em .35em; border-radius: 4px; font-size: .9em; }
+  pre code { background: none; padding: 0; }
+  .badges { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1.25rem 0 0; }
+  .badge {
+    border: 1px solid var(--line); border-radius: 999px; padding: .25rem .7rem;
+    font-size: .8rem; color: var(--dim); background: var(--card);
+  }
+  .cta { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1.5rem 0 0; }
+  .btn {
+    display: inline-block; padding: .6rem 1.1rem; border-radius: 8px; text-decoration: none;
+    border: 1px solid var(--accent); color: var(--accent); font-weight: 600;
+  }
+  .btn.primary { background: var(--accent); color: var(--bg); }
+  table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+  .scroll { overflow-x: auto; margin: 1.25rem 0; }
+  th, td { text-align: left; padding: .55rem .7rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; font-size: .82rem; text-transform: uppercase; letter-spacing: .04em; }
+  ul { padding-left: 1.15rem; }
+  li { margin: .35rem 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1rem; margin: 1.25rem 0; }
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.1rem; background: var(--card); }
+  .card h3 { margin-top: 0; }
+  footer { border-top: 1px solid var(--line); margin-top: 4rem; padding: 2rem 0 3rem; color: var(--dim); font-size: .9rem; }
+  .note { color: var(--dim); font-size: .9rem; }
+  .figure { border: 1px solid var(--line); border-radius: 12px; background: var(--card); padding: .5rem; }
+  .figure svg { display: block; width: 100%; min-width: 56rem; height: auto; }
+  figcaption { color: var(--dim); font-size: .875rem; padding: .5rem .75rem 0; }
+  .stopbox {
+    border: 1px solid var(--stop); border-left-width: 4px; border-radius: 8px;
+    background: var(--card); padding: .9rem 1.1rem; margin: 1.25rem 0;
+  }
+  .stopbox strong { color: var(--stop); }
+
+  /* ---- diagram animation ------------------------------------------------ */
+  .lbl { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: var(--fg); }
+  .lbl-sm { font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: var(--dim); }
+  .lbl-hd { font: 600 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            fill: var(--dim); letter-spacing: .08em; text-transform: uppercase; }
+  .box { fill: var(--bg); stroke: var(--line); stroke-width: 1.5; }
+  .box-accent { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+  .box-stop { fill: none; stroke: var(--stop); stroke-width: 1.5; }
+  .wire { fill: none; stroke: var(--line); stroke-width: 1.5; }
+  .wire-live { fill: none; stroke: var(--flow); stroke-width: 1.5; opacity: .45; }
+
+  .pkt { fill: var(--flow); }
+  .pkt-stop { fill: var(--stop); }
+
+  @keyframes travel { from { offset-distance: 0%; } to { offset-distance: 100%; } }
+  @keyframes fade  { 0%,8% { opacity: 0; } 14%,86% { opacity: 1; } 94%,100% { opacity: 0; } }
+  .flow {
+    offset-rotate: 0deg;
+    animation: travel 4.4s linear infinite, fade 4.4s linear infinite;
+  }
+  .p1 { offset-path: path("M 220 158 L 276 158 L 276 96 L 352 96"); }
+  .p2 { offset-path: path("M 220 158 L 352 158"); }
+  .p3 { offset-path: path("M 220 158 L 276 158 L 276 220 L 352 220"); }
+  .q1 { offset-path: path("M 492 96 L 540 96"); }
+  .q2 { offset-path: path("M 492 158 L 540 158"); }
+  .q3 { offset-path: path("M 492 220 L 540 220"); }
+  .r1 { offset-path: path("M 676 96 L 712 96 L 712 158 L 748 158"); }
+  .r2 { offset-path: path("M 676 158 L 748 158"); }
+  .r3 { offset-path: path("M 676 220 L 712 220 L 712 158 L 748 158"); }
+  .d0 { animation-delay: 0s; }
+  .d1 { animation-delay: .5s; }
+  .d2 { animation-delay: 1s; }
+  .d3 { animation-delay: 1.5s; }
+  .d4 { animation-delay: 2s; }
+  .d5 { animation-delay: 2.5s; }
+
+  /* form fields filling in each worker's tab */
+  @keyframes fill { 0%,10% { width: 0; } 55%,100% { width: 46px; } }
+  .field { fill: var(--flow); opacity: .55; animation: fill 4.4s ease-in-out infinite; }
+
+  /* the blocked lane pulsing for attention */
+  @keyframes glow { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
+  .pulse { animation: glow 2.2s ease-in-out infinite; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .flow, .field, .pulse { animation: none; }
+    .flow { opacity: 1; }
+    .field { width: 46px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>Parallel applying <span class="dim">/ how the fleet actually runs</span></h1>
+    <p class="lead">One VS Code window. Several terminals. One Claude Code session in each. A
+      private Chrome tab per session. And a hard stop before anything is sent.</p>
+    <div class="badges">
+      <span class="badge">one Chrome, N tab groups</span>
+      <span class="badge">one worker per host</span>
+      <span class="badge">atomic claiming</span>
+      <span class="badge">never submits</span>
+    </div>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/MSKazemi/opportunity-engine">opportunity-engine</a>
+      <a class="btn" href="https://github.com/MSKazemi/agent-fleet">agent-fleet</a>
+      <a class="btn" href="./">← docs home</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<h2>The whole pipeline</h2>
+<p>Left to right: openings become scored matches, matches become packages, packages become queued
+  tasks, and the queue fans out into as many workers as the work and the machine justify. The last
+  hop is the one that never happens automatically.</p>
+
+<figure class="figure">
+  <div class="scroll">
+  <svg viewBox="0 0 1020 268" role="img" aria-labelledby="figtitle figdesc">
+    <title id="figtitle">opportunity-engine to agent-fleet parallel pipeline</title>
+    <desc id="figdesc">Prepared application packages enter a shared queue, three parallel workers
+      each claim tasks and fill forms in their own Chrome tab, and every result lands in a blocked
+      lane awaiting human review before submission.</desc>
+
+    <!-- column headings -->
+    <text class="lbl-hd" x="40"  y="30">prepare</text>
+    <text class="lbl-hd" x="352" y="30">queue</text>
+    <text class="lbl-hd" x="540" y="30">workers · parallel</text>
+    <text class="lbl-hd" x="748" y="30">human gate</text>
+
+    <!-- stage 1: opp -->
+    <rect class="box" x="40" y="112" width="180" height="92" rx="9"/>
+    <text class="lbl"    x="56" y="138">opp scan</text>
+    <text class="lbl"    x="56" y="160">opp match</text>
+    <text class="lbl"    x="56" y="182">opp apply --fleet</text>
+    <text class="lbl-sm" x="56" y="198">→ packages on disk</text>
+
+    <!-- wires prepare → queue -->
+    <path class="wire" d="M 220 158 L 276 158 L 276 96 L 352 96"/>
+    <path class="wire" d="M 220 158 L 352 158"/>
+    <path class="wire" d="M 220 158 L 276 158 L 276 220 L 352 220"/>
+
+    <!-- stage 2: queue -->
+    <rect class="box-accent" x="352" y="64" width="140" height="176" rx="9"/>
+    <text class="lbl-sm" x="352" y="56">.agents/queue/inbox</text>
+    <rect class="box" x="366" y="82" width="112" height="28" rx="5"/>
+    <text class="lbl-sm" x="376" y="100">p3 greenhouse</text>
+    <rect class="box" x="366" y="144" width="112" height="28" rx="5"/>
+    <text class="lbl-sm" x="376" y="162">p3 lever</text>
+    <rect class="box" x="366" y="206" width="112" height="28" rx="5"/>
+    <text class="lbl-sm" x="376" y="224">p5 ashby</text>
+
+    <!-- wires queue → workers -->
+    <path class="wire" d="M 492 96 L 540 96"/>
+    <path class="wire" d="M 492 158 L 540 158"/>
+    <path class="wire" d="M 492 220 L 540 220"/>
+
+    <!-- stage 3: three workers -->
+    <g>
+      <rect class="box-accent" x="540" y="70" width="136" height="52" rx="8"/>
+      <text class="lbl-sm" x="550" y="90">terminal 1</text>
+      <text class="lbl-sm" x="550" y="106">own Chrome tab</text>
+      <rect x="550" y="112" width="46" height="4" rx="2" fill="var(--line)"/>
+      <rect class="field d0" x="550" y="112" height="4" rx="2"/>
+    </g>
+    <g>
+      <rect class="box-accent" x="540" y="132" width="136" height="52" rx="8"/>
+      <text class="lbl-sm" x="550" y="152">terminal 2</text>
+      <text class="lbl-sm" x="550" y="168">own Chrome tab</text>
+      <rect x="550" y="174" width="46" height="4" rx="2" fill="var(--line)"/>
+      <rect class="field d2" x="550" y="174" height="4" rx="2"/>
+    </g>
+    <g>
+      <rect class="box-accent" x="540" y="194" width="136" height="52" rx="8"/>
+      <text class="lbl-sm" x="550" y="214">terminal 3</text>
+      <text class="lbl-sm" x="550" y="230">own Chrome tab</text>
+      <rect x="550" y="236" width="46" height="4" rx="2" fill="var(--line)"/>
+      <rect class="field d4" x="550" y="236" height="4" rx="2"/>
+    </g>
+
+    <!-- wires workers → gate -->
+    <path class="wire-live" d="M 676 96 L 712 96 L 712 158 L 748 158"/>
+    <path class="wire-live" d="M 676 158 L 748 158"/>
+    <path class="wire-live" d="M 676 220 L 712 220 L 712 158 L 748 158"/>
+
+    <!-- stage 4: human gate -->
+    <rect class="box-stop pulse" x="748" y="112" width="240" height="92" rx="9"/>
+    <text class="lbl"    x="764" y="138" style="fill:var(--stop)">blocked — awaiting you</text>
+    <text class="lbl-sm" x="764" y="158">form filled · screenshot taken</text>
+    <text class="lbl-sm" x="764" y="176">ready to submit: org — title</text>
+    <text class="lbl-sm" x="764" y="194" style="fill:var(--stop)">nothing has been sent</text>
+
+    <!-- travelling packets -->
+    <circle class="pkt flow p1 d0" r="4"/>
+    <circle class="pkt flow p2 d1" r="4"/>
+    <circle class="pkt flow p3 d2" r="4"/>
+    <circle class="pkt flow q1 d1" r="4"/>
+    <circle class="pkt flow q2 d2" r="4"/>
+    <circle class="pkt flow q3 d3" r="4"/>
+    <circle class="pkt-stop flow r1 d3" r="4"/>
+    <circle class="pkt-stop flow r2 d4" r="4"/>
+    <circle class="pkt-stop flow r3 d5" r="4"/>
+  </svg>
+  </div>
+  <figcaption>Every arrow into the red box is automatic. Nothing leaves it without you.</figcaption>
+</figure>
+
+<h2>Requirements</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>Layer</th><th>Needs</th><th>If missing</th></tr></thead>
+  <tbody>
+    <tr><td>opportunity-engine</td><td><code>python3</code> ≥ 3.10, <code>curl</code></td><td>nothing runs / scans get very slow</td></tr>
+    <tr><td>PDF CVs</td><td><code>pdflatex</code></td><td>you still get <code>.tex</code></td></tr>
+    <tr><td>Queueing (<code>--fleet</code>)</td><td>nothing extra</td><td>—</td></tr>
+    <tr><td>Running the fleet</td><td><a href="https://github.com/MSKazemi/agent-fleet">agent-fleet</a></td><td><code>--fleet</code> writes <code>fleet-batch.txt</code> instead</td></tr>
+    <tr><td>Terminal workers</td><td>X11, <code>xdotool</code>, a VS Code window</td><td>falls back to headless — <em>no browser</em></td></tr>
+    <tr><td>Browser workers</td><td>Claude for Chrome, terminal mode</td><td>tasks come back blocked, never faked</td></tr>
+  </tbody>
+</table>
+</div>
+
+<pre><code># the tool
+git clone https://github.com/MSKazemi/opportunity-engine ~/opportunity-engine
+~/opportunity-engine/bin/install
+
+# the fleet (optional, needed only to run workers in parallel)
+git clone https://github.com/MSKazemi/agent-fleet ~/agent-fleet
+~/agent-fleet/bin/install
+
+# your data — a private directory, NOT a clone of a public repo
+cd ~/your-private-dir &amp;&amp; opp init &amp;&amp; opp ingest ~/cv.pdf</code></pre>
+
+<h2>How many workers?</h2>
+<p>The number is never guessed. It is the smallest of four ceilings, re-checked on every run:</p>
+<div class="grid">
+  <div class="card"><h3>The work</h3><p class="note">Only tasks that actually need a rendered page
+    take a terminal. Research and drafting run as in-session subagents with no tab at all.</p></div>
+  <div class="card"><h3>One per host</h3><p class="note">Ten postings across three boards become
+    three terminals — so no single site sees parallel traffic from you.</p></div>
+  <div class="card"><h3>Your cap</h3><p class="note"><code>max_workers</code> in
+    <code>.agents/config.json</code>. An explicit ceiling always wins.</p></div>
+  <div class="card"><h3>This machine</h3><p class="note">Free RAM, cores and current load, measured
+    now — not assumed. <code>fleet plan</code> shows the arithmetic.</p></div>
+</div>
+
+<h2>Why the tabs do not collide</h2>
+<p>Each Claude session gets its own <strong>per-session tab group</strong>. A worker sees only the
+  tabs it created — it cannot navigate, read or close another worker's page, because the other
+  worker's tabs are not in its context at all. That isolation is enforced by the platform, not by
+  asking workers to behave.</p>
+<p class="note">Measured on 2026-08-16: two interactive Claude Code sessions held live connections
+  to the same Chrome simultaneously, each reporting a distinct <code>tabGroupId</code> and listing
+  only its own tabs. Print mode (<code>claude -p</code>) has no browser at all, which is why the
+  browser lane needs <code>fleet run --terminals</code> rather than <code>--headless</code>.</p>
+
+<h2>Where it stops</h2>
+<div class="stopbox">
+  <p><strong>A worker fills the form and stops.</strong> It screenshots the completed form and
+    blocks with <code>ready to submit: &lt;org&gt; — &lt;title&gt;</code>. It never clicks submit,
+    never types a password, never creates an account, never solves a CAPTCHA, never enters a
+    one-time code, and never enters bank, card or tax details.</p>
+  <p class="note" style="margin-bottom:0">Those rules travel inside each task
+    (<code>&lt;package&gt;/fleet-task.json</code>) rather than living in the worker, so a worker
+    cannot be configured into breaking them. A field that cannot be filled truthfully from your own
+    profile is escalated to you, never guessed — most forms ask those questions under a
+    declaration.</p>
+</div>
+<p>You clear the gate in batches:</p>
+<pre><code>fleet blocked          # everything waiting, grouped by reason
+fleet unblock --all    # release them back after you have dealt with each
+opp applied &lt;id&gt; --evidence "confirmation #12345 shown on screen"</code></pre>
+<p class="note">An application is recorded as <code>applied</code> only with the confirmation the
+  system actually returned. A worker that cannot see one blocks with what it did see, rather than
+  reporting success it cannot prove.</p>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Built by <a href="https://mskazemi.com">Mohsen Seyedkazemi Ardebili</a> ·
+      <a href="https://github.com/MSKazemi">GitHub</a> ·
+      <a href="https://github.com/MSKazemi/agent-fleet">agent-fleet</a> ·
+      <a href="./">docs home</a></p>
+    <p>Apache-2.0. Job-posting data belongs to the respective platforms and employers.</p>
+  </div>
+</footer>
+
+</body>
+</html>

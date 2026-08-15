@@ -111,6 +111,22 @@ drops the candidate.
 
 ---
 
+## Requirements
+
+Nothing here needs an account, an API key, or a card.
+
+| | Needed for | Required? |
+|---|---|---|
+| `python3` ≥ 3.10 | everything | **yes** — standard library only, no pip install |
+| `curl` | scanning feeds | strongly recommended (see below) |
+| `pdflatex` | `opp cv build` producing a PDF | optional — without it you still get `.tex` |
+| [agent-fleet](https://github.com/MSKazemi/agent-fleet) | `opp apply --fleet` | optional — see [Filling many forms at once](#filling-many-forms-at-once) |
+
+> `curl` is not decoration. Measured on 2026-08-15 against a 1.3 MB feed: curl 1.7 s, Python's
+> `urllib` 360 s for byte-identical output — the body trickles slowly enough that the socket
+> timeout never fires, so the transfer is not slow enough to fail, only slow enough to ruin a
+> scan. The tool uses curl when present and falls back to `urllib` when it isn't.
+
 ## Install
 
 ```bash
@@ -119,13 +135,36 @@ git clone https://github.com/MSKazemi/opportunity-engine ~/opportunity-engine
 opp --version
 ```
 
-**Requirements:** `python3` (standard library only) and `curl`. LaTeX (`pdflatex`) only if you
-want PDFs out of the CV generator.
+`bin/install` **symlinks**, it does not copy — the clone stays the single source of truth, so
+`git pull` updates every workspace at once. Re-run it after moving the clone.
 
-> `curl` is not decoration. Measured on 2026-08-15 against a 1.3 MB feed: curl 1.7 s, Python's
-> `urllib` 360 s for byte-identical output — the body trickles slowly enough that the socket
-> timeout never fires, so the transfer is not slow enough to fail, only slow enough to ruin a
-> scan. The tool uses curl when present and falls back to `urllib` when it isn't.
+### The tool and your data are separate — keep them that way
+
+Clone **once**. Do not clone again to hold your applications: the workspace is resolved from
+where you *are*, so one installed copy serves as many workspaces as you like.
+
+```bash
+cd ~/where/your/private/job-search/lives
+opp init                               # creates .opp/ — your data, right here
+opp ingest ~/path/to/cv.pdf
+```
+
+```
+~/opportunity-engine/     the tool     — public, one clone, git pull to update
+~/your-private-dir/.opp/  your data    — profile, opportunities, applications, packages
+```
+
+A workspace holds your CV, the openings you found, and every application package. Put it
+somewhere private and **not** inside a clone whose remote is a public repository — `.opp/` is
+gitignored here, but a gitignore is a safety net, not a design. If no workspace is found,
+`~/.opportunity` is used.
+
+### Verify
+
+```bash
+bin/selftest        # 156 checks, no network, no key, no account
+opp doctor          # whether this setup can actually work
+```
 
 ---
 
@@ -169,29 +208,65 @@ This is **v0.4**. What is real is marked real; nothing here is aspirational.
 ## Filling many forms at once
 
 Ten packages is ten forms to fill by hand. `--fleet` hands them to
-[agent-fleet](https://github.com/MSKazemi/agent-fleet), which runs as many parallel
-sessions as the work and the machine actually justify:
+[agent-fleet](https://github.com/MSKazemi/agent-fleet), which turns one queue into several
+parallel workers — each its own terminal, its own Claude session, and its own Chrome tab.
 
-```bash
-opp apply --top 10 --fleet    # prepare ten packages, and queue ten tasks
-fleet plan                    # how many terminals this deserves, and why
-fleet run                     # go
-fleet blocked                 # what is ready for you
+**📊 [See the animated architecture →](https://mskazemi.com/opportunity-engine/parallel.html)**
+
+### What actually runs in parallel
+
+```
+one VS Code window
+├── terminal 1 → Claude session → its own Chrome tab → greenhouse.io  ─┐
+├── terminal 2 → Claude session → its own Chrome tab → lever.co        ├── one Chrome
+└── terminal 3 → Claude session → its own Chrome tab → ashbyhq.com    ─┘
 ```
 
-`fleet plan` caps one worker per host, so ten postings across three boards become three
-terminals rather than ten tabs against one site. Best fit is claimed first.
+Each session gets its own **per-session tab group** and can see only its own tabs, so workers
+cannot navigate or close each other's pages. Measured on 2026-08-16: two sessions held live
+connections to one Chrome simultaneously, each with a distinct `tabGroupId`.
 
-**A worker fills the form and stops.** It never clicks submit. Every task ends in fleet's
-`blocked` lane with a screenshot of the completed form and the reason
-`ready to submit: <org> — <title>`, and you clear them in batches. That is the design, not
-a limitation: sending an application is a human act with your name on it, and the same rule
-that stops the tool inventing a salary figure stops it pressing send. Anything behind a
-login, CAPTCHA or 2FA parks the same way, with the wall named.
+### Install agent-fleet first (optional)
 
-agent-fleet is optional. Without it, `--fleet` writes `fleet-batch.txt` into the workspace
-in `fleet add-batch` format and tells you the command; opportunity-engine keeps its
-stdlib-only, zero-dependency install either way.
+```bash
+git clone https://github.com/MSKazemi/agent-fleet ~/agent-fleet
+~/agent-fleet/bin/install              # symlinks `fleet` into ~/.local/bin
+fleet --help
+```
+
+Terminal mode additionally needs **X11 + `xdotool`** and a VS Code window open on the
+workspace. Without agent-fleet, `--fleet` still works: it writes `fleet-batch.txt` into the
+workspace in `fleet add-batch` format and prints the command to run later. opportunity-engine
+keeps its stdlib-only, zero-dependency install either way.
+
+### Run it
+
+```bash
+cd ~/your-private-dir             # the workspace, where .opp/ lives
+opp apply --top 10 --fleet        # prepare ten packages, queue ten tasks
+fleet plan                        # how many terminals this deserves, and why
+fleet run --terminals             # go
+fleet blocked                     # what is ready for you
+```
+
+`fleet plan` caps **one worker per host**, so ten postings across three boards become three
+terminals rather than ten tabs hammering one site. Best fit is claimed first — the score from
+`opp match` becomes the queue priority. Claiming a task is a single atomic `rename(2)`, so two
+workers never take the same posting.
+
+> **Use `--terminals`, not `--headless`, for form filling.** A headless worker has no Chrome
+> and will block every browser task. `fleet doctor` tells you which mode your machine supports.
+
+### A worker fills the form and stops
+
+It never clicks submit. Every task ends in fleet's `blocked` lane with a screenshot of the
+completed form and the reason `ready to submit: <org> — <title>`, and you clear them in
+batches. That is the design, not a limitation: sending an application is a human act with your
+name on it, and the same rule that stops the tool inventing a salary figure stops it pressing
+send. Anything behind a login, CAPTCHA or 2FA parks the same way, with the wall named.
+
+The rules travel **inside** each task (`<package>/fleet-task.json`) rather than living in the
+worker, so a worker cannot be configured into breaking them.
 
 ---
 

@@ -67,6 +67,7 @@ The candidate profile is JSON Resume; opportunities are stored in schema.org/Job
 
 - Source code: https://github.com/MSKazemi/opportunity-engine
 - README: https://github.com/MSKazemi/opportunity-engine#readme
+- Parallel applying, architecture and requirements: https://mskazemi.com/opportunity-engine/parallel.html
 - Source registry: https://github.com/MSKazemi/opportunity-engine/blob/main/data/sources.json
 - Contributing: https://github.com/MSKazemi/opportunity-engine/blob/main/CONTRIBUTING.md
 - Author: Mohsen Seyedkazemi Ardebili, https://mskazemi.com
