@@ -131,7 +131,7 @@ want PDFs out of the CV generator.
 
 ## Status
 
-This is **v0.2**. What is real is marked real; nothing here is aspirational.
+This is **v0.3**. What is real is marked real; nothing here is aspirational.
 
 | Piece | State |
 |---|---|
@@ -143,7 +143,7 @@ This is **v0.2**. What is real is marked real; nothing here is aspirational.
 | `opp ingest` — CV/JSON/text → one profile, nothing inferred | **working** |
 | `opp profile` — what you can claim, and what is missing | **working** |
 | `opp match` — two-stage scoring, per-requirement evidence, knockouts | **working** |
-| `opp cv build` — tailored LaTeX → PDF | next |
+| `opp cv` — parser-safe LaTeX → PDF, tailored by reordering only | **working** |
 | `opp apply` — package assembly, human clears the walls | next |
 
 ---

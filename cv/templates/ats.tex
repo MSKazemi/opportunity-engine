@@ -1,0 +1,76 @@
+% opportunity-engine — one-column, parser-safe CV template
+% SPDX-License-Identifier: Apache-2.0
+%
+% Every choice here serves one goal: the first machine that reads this document
+% turns it back into plain text, and it must come out in the right order.
+%
+%   One column           — two columns interleave into nonsense when extracted.
+%   No tabular content   — tables scramble; only inline rows for skills, which
+%                          read correctly because each is a single line.
+%   Standard headings    — "Experience", "Education", "Skills". A parser looks
+%                          for these words; a clever synonym costs you a section.
+%   Real text, no images — text inside a graphic does not exist to a parser.
+%   Nothing in headers   — header/footer content is routinely dropped, so the
+%                          contact line lives in the body.
+%
+% Substitution is {{ key }}, filled by libexec/oe/cv.py. Everything inserted is
+% LaTeX-escaped there, so a stray & or % in a profile cannot break the build.
+
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1.6cm]{geometry}
+\usepackage{textcomp}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{parskip}
+
+\hypersetup{
+  colorlinks=true, urlcolor=[rgb]{0.10,0.35,0.55}, linkcolor=black,
+  pdftitle={{{ name }} — CV}, pdfauthor={{{ name }}},
+}
+
+\pagestyle{empty}
+
+\titleformat{\section}{\large\bfseries}{}{0em}{}[\vspace{-0.6em}\rule{\textwidth}{0.4pt}]
+\titlespacing*{\section}{0pt}{1.1em}{0.5em}
+
+% \role{title}{organisation}{location}{dates}
+\newcommand{\role}[4]{%
+  \textbf{#1}, #2\hfill #4\\%
+  \ifx&#3&\else\textit{#3}\\\fi%
+}
+
+% \skillrow{group}{comma-separated keywords} — one line, so it extracts in order
+\newcommand{\skillrow}[2]{\textbf{#1}: #2\par}
+
+\begin{document}
+
+\begin{center}
+  {\LARGE\bfseries {{ name }}}\\[0.25em]
+  {\large {{ label }}}\\[0.4em]
+  {{ contact }}
+\end{center}
+
+\vspace{0.4em}
+
+{{ summary }}
+
+\section{Experience}
+{{ work }}
+
+\section{Education}
+{{ education }}
+
+\section{Skills}
+{{ skills }}
+
+{{ projects_section }}
+{{ projects }}
+
+{{ publications_section }}
+{{ publications }}
+
+\end{document}

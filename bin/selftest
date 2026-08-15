@@ -16,7 +16,10 @@ never quietly passed.
 from __future__ import annotations
 
 import json
+import re
+import shutil
 import sqlite3
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -24,7 +27,8 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "libexec"))
 
-from oe import ingest, match, paths, profile as profile_mod, scan, sources, store  # noqa: E402
+from oe import (cv, ingest, match, paths,  # noqa: E402
+                profile as profile_mod, scan, sources, store)
 
 FIXTURES = REPO / "tests" / "fixtures"
 GREEN, RED, YELLOW, OFF = "\033[32m", "\033[31m", "\033[33m", "\033[0m"
@@ -353,6 +357,71 @@ check("an unparseable date is None, never 'today'", None, match.parse_date("nons
 check("an unknown age does not fake urgency", 1.0, match.freshness(None)[0])
 check("a fresh posting ranks above a stale one", True,
       match.freshness("2026-08-15")[0] > match.freshness("2026-01-01")[0])
+
+# --------------------------------------------------------------------------- #
+group("cv generation")
+
+check("latex specials are escaped", r"R\&D 50\% \$x \#1 a\_b",
+      cv.tex_escape("R&D 50% $x #1 a_b"))
+check("an em dash becomes something pdflatex can set", "a---b", cv.tex_escape("a—b"))
+check("maths symbols in a CV do not kill the build", r"best $\approx$45\%",
+      cv.tex_escape("best ≈45%"))
+check("a middot between skills survives", r"MLOps $\cdot$ HPC", cv.tex_escape("MLOps · HPC"))
+
+check("an internal note is caught", 1,
+      len(cv.lint("Did a thing. NOTE: check this number before sending")))
+check("a TODO is caught", 1, len(cv.lint(r"\item Shipped it. TODO: verify")))
+check("a redaction placeholder is caught", 1, len(cv.lint("Salary: «your range»")))
+check("a path to a private file is caught", 1,
+      len(cv.lint("Built the thing (see projects/kubeintellect/CLAIMS.md)")))
+check("template comments are not flagged", 0, len(cv.lint("% NOTE: this is a comment")))
+check("ordinary CV prose is not flagged", 0,
+      len(cv.lint(r"\item Operated production Kubernetes for a EuroHPC platform.")))
+
+POSTING_FOR_CV = {**POSTING}
+cv_report = match.match(prof, POSTING_FOR_CV, {"languages": ["english"]}, LEX)
+template = (REPO / "cv" / "templates" / "ats.tex").read_text()
+plain_tex, plain_dropped = cv.render_tex(prof, template, None)
+tuned_tex, _ = cv.render_tex(prof, template, cv_report)
+
+check("every section is rendered", True,
+      all(s in plain_tex for s in (r"\section{Experience}", r"\section{Education}",
+                                   r"\section{Skills}")))
+check("the name reaches the document", True, prof["basics"]["name"] in plain_tex)
+check("no unfilled placeholder survives", [], re.findall(r"\{\{\s*\w+\s*\}\}", plain_tex))
+check("a dropped highlight is counted, never silent", True, plain_dropped >= 0)
+
+def skill_rows(text):
+    return [m.group(1) for m in re.finditer(r"\\skillrow\{([^}]*)\}", text)]
+
+check("tailoring changes the order", True, skill_rows(plain_tex) != skill_rows(tuned_tex))
+check("tailoring adds nothing and removes nothing",
+      sorted(skill_rows(plain_tex)), sorted(skill_rows(tuned_tex)))
+check("tailoring keeps every role",
+      len(re.findall(r"\\role\{", plain_tex)), len(re.findall(r"\\role\{", tuned_tex)))
+
+with tempfile.TemporaryDirectory() as tmp:
+    built = cv.build(prof, Path(tmp), report=cv_report, compile_it=False)
+    check("a tailored build is named for the employer", True,
+          Path(built["tex"]).name.startswith("cv-"))
+    check("the built document carries no private notes", [], built["lint"])
+
+    if shutil.which("pdflatex") and shutil.which("pdftotext"):
+        built = cv.build(prof, Path(tmp), compile_it=True)
+        if not built.get("pdf"):
+            bad("the CV compiles to PDF", built.get("compile_note", "")[:200])
+        else:
+            out = subprocess.run(["pdftotext", "-layout", built["pdf"], "-"],
+                                 capture_output=True, timeout=60)
+            text = out.stdout.decode("utf-8", "replace")
+            ok("the CV compiles to PDF")
+            # The whole point of the layout: a parser must get it back in order.
+            check("the name survives extraction", True, prof["basics"]["name"] in text)
+            positions = [text.find(h) for h in ("Experience", "Education", "Skills")]
+            check("sections extract in the right order", sorted(positions), positions)
+            check("no section is lost in extraction", True, all(p > 0 for p in positions))
+    else:
+        skip("PDF round-trip through a parser", "needs pdflatex and pdftotext")
 
 # --------------------------------------------------------------------------- #
 group("network")

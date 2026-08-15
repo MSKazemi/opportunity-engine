@@ -36,7 +36,7 @@ The candidate profile is JSON Resume; opportunities are stored in schema.org/Job
 - Storage: a local SQLite file in a workspace directory you own; nothing is uploaded anywhere
 - Sources: 27 recorded, 13 verified live by HTTP request on 2026-08-15
 - Cost: every enabled source is usable with no card attached; paid sources are recorded and flagged
-- Self-test: 90 checks that need no network, no API key and no account
+- Self-test: 113 checks that need no network, no API key and no account
 
 ## Commands
 
@@ -44,6 +44,9 @@ The candidate profile is JSON Resume; opportunities are stored in schema.org/Job
 - `opp sources` — list where opportunities can be found and what each gives away free
 - `opp sources-check` — re-verify sources by actually calling them
 - `opp scan` — pull live openings from every key-free feed
+- `opp ingest` / `opp profile` — build one profile from a CV, a resume.json or a LinkedIn export
+- `opp match` — two-stage scoring against a posting, with the evidence for each requirement
+- `opp cv` — a one-column, parser-safe LaTeX/PDF CV, tailored by reordering only
 - `opp list` / `opp show` — read what was found
 - `opp doctor` — report whether the setup can actually work
 

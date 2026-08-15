@@ -22,7 +22,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "libexec"))
 
-from oe import __version__, ingest, match, paths, profile as profile_mod, scan, sources, store  # noqa: E402
+from oe import (__version__, cv, ingest, match, paths,  # noqa: E402
+                profile as profile_mod, scan, sources, store)
 
 GREEN, RED, YELLOW, DIM, OFF = "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[0m"
 
@@ -218,6 +219,58 @@ def cmd_match(args) -> int:
         for report in blocked[:10]:
             print(f"  {report['title'][:50]:<50} {report['knockouts'][0]['why']}")
     con.close()
+    return 0
+
+
+def cmd_cv(args) -> int:
+    loaded = profile_mod.load()
+    if loaded is None:
+        print("no profile — run: opp ingest <files>", file=sys.stderr)
+        return 2
+
+    report = None
+    if args.__dict__.get("for_id"):
+        con = store.connect(paths.db_path())
+        row = con.execute("SELECT * FROM opportunities WHERE id = ?",
+                          (args.for_id,)).fetchone()
+        con.close()
+        if row is None:
+            print(f"no opportunity {args.for_id}", file=sys.stderr)
+            return 2
+        report = match.match(loaded, dict(row), paths.load_config(), match.lexicon())
+        if report["verdict"] == "knocked-out":
+            print(f"{YELLOW}note{OFF}: this role is knocked out "
+                  f"({report['knockouts'][0]['why']}). Building anyway, since you asked.")
+
+    out = Path(args.out) if args.out else (paths.find_workspace() / "cv")
+    try:
+        result = cv.build(loaded, out, variant=args.variant, report=report,
+                          compile_it=not args.no_pdf)
+    except FileNotFoundError as err:
+        print(f"{err}", file=sys.stderr)
+        return 2
+
+    print(f"  tex: {result['tex']}")
+    if result.get("highlights_dropped"):
+        print(f"  {DIM}{result['highlights_dropped']} highlight(s) beyond 6 per role were left "
+              f"out to keep this readable — the ones kept are the most relevant.{OFF}")
+    if result.get("lint"):
+        print(f"\n  {RED}this document contains text that looks like private notes:{OFF}")
+        for problem in result["lint"][:8]:
+            print(f"    {problem}")
+        print(f"  {DIM}Fix it in your profile before sending this to anyone.{OFF}")
+    if result.get("pdf"):
+        print(f"  pdf: {result['pdf']}")
+    elif result.get("compile_note"):
+        print(f"  {YELLOW}pdf not built{OFF}: {result['compile_note'].splitlines()[0]}")
+    if report:
+        print(f"\n  tailored for: {result['tailored_for']}")
+        print(f"  {DIM}Order changed only. Nothing was added to your profile, and nothing "
+              f"in this document is a claim your profile does not already make.{OFF}")
+        weak = report.get("unsupported_claims") or []
+        if weak:
+            print(f"  {YELLOW}listed but not demonstrated anywhere{OFF}: {', '.join(weak[:8])}")
+            print(f"  {DIM}A reader who asks about these will find nothing behind them.{OFF}")
     return 0
 
 
@@ -451,6 +504,13 @@ def main() -> int:
     p.add_argument("--verbose", "-v", action="store_true", help="show the evidence per requirement")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_match)
+
+    p = sub.add_parser("cv", help="build a parser-safe CV from your profile")
+    p.add_argument("--for", dest="for_id", help="tailor the ORDER for one opportunity id")
+    p.add_argument("--variant", default="ats")
+    p.add_argument("--out", help="output directory (default: the workspace)")
+    p.add_argument("--no-pdf", action="store_true", help="write .tex only")
+    p.set_defaults(func=cmd_cv)
 
     p = sub.add_parser("sources", help="where opportunities can be found, and what each costs")
     p.add_argument("--free-only", action="store_true", help="only what needs no card")
