@@ -1,0 +1,73 @@
+{
+ "jobs": [
+  {
+   "absolute_url": "https://job-boards.greenhouse.io/gitlab/jobs/8503792002",
+   "data_compliance": [
+    {
+     "type": "gdpr",
+     "requires_consent": false,
+     "requires_processing_consent": false,
+     "requires_retention_consent": false,
+     "retention_period": null,
+     "demographic_data_consent_applies": false
+    }
+   ],
+   "internal_job_id": 6396658002,
+   "location": {
+    "name": "Remote, Italy"
+   },
+   "metadata": [
+    {
+     "id": 4595831002,
+     "name": "Quota Coverage Type",
+     "value": "Account Executive",
+     "value_type": "single_select"
+    }
+   ],
+   "id": 8503792002,
+   "updated_at": "2026-08-10T16:52:46-04:00",
+   "requisition_id": "6263",
+   "title": "Account Executive - Italy",
+   "company_name": "GitLab",
+   "first_published": "2026-04-17T05:58:03-04:00",
+   "language": "en",
+   "application_deadline": null
+  },
+  {
+   "absolute_url": "https://job-boards.greenhouse.io/gitlab/jobs/8556658002",
+   "data_compliance": [
+    {
+     "type": "gdpr",
+     "requires_consent": false,
+     "requires_processing_consent": false,
+     "requires_retention_consent": false,
+     "retention_period": null,
+     "demographic_data_consent_applies": false
+    }
+   ],
+   "internal_job_id": 6417799002,
+   "location": {
+    "name": "Remote, Bangalore"
+   },
+   "metadata": [
+    {
+     "id": 4595831002,
+     "name": "Quota Coverage Type",
+     "value": "n/a",
+     "value_type": "single_select"
+    }
+   ],
+   "id": 8556658002,
+   "updated_at": "2026-08-11T08:18:18-04:00",
+   "requisition_id": "6401",
+   "title": "AI Engineer",
+   "company_name": "GitLab",
+   "first_published": "2026-05-22T09:16:29-04:00",
+   "language": "en",
+   "application_deadline": null
+  }
+ ],
+ "meta": {
+  "total": 196
+ }
+}

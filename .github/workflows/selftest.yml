@@ -1,0 +1,22 @@
+name: selftest
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Sources go stale quietly. Once a week, actually call them.
+    - cron: "17 6 * * 1"
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: offline suite
+        run: ./bin/selftest
+      - name: live source verification
+        if: github.event_name == 'schedule'
+        run: ./bin/selftest --net

@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Copyright 2026 Mohsen Seyedkazemi Ardebili
+# SPDX-License-Identifier: Apache-2.0
+# Part of opportunity-engine — https://github.com/MSKazemi/opportunity-engine
+#
+# Symlinks, never copies: the clone stays the single source of truth, so an edit
+# takes effect everywhere at once. Re-run after moving the clone to repair links.
+set -euo pipefail
+
+REPO="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+BIN_DIR="${HOME}/.local/bin"
+
+uninstall() {
+  rm -f "${BIN_DIR}/opp"
+  echo "removed ${BIN_DIR}/opp"
+  exit 0
+}
+
+[[ "${1:-}" == "--uninstall" ]] && uninstall
+
+mkdir -p "${BIN_DIR}"
+ln -sfn "${REPO}/bin/opp" "${BIN_DIR}/opp"
+echo "linked ${BIN_DIR}/opp -> ${REPO}/bin/opp"
+
+command -v python3 >/dev/null || echo "WARNING: python3 not on PATH — nothing will run" >&2
+command -v curl    >/dev/null || echo "NOTE: curl not found; scans fall back to urllib and get much slower" >&2
+command -v pdflatex >/dev/null || echo "NOTE: pdflatex not found; 'opp cv build' can emit .tex but not .pdf" >&2
+
+case ":${PATH}:" in
+  *":${BIN_DIR}:"*) ;;
+  *) echo "NOTE: ${BIN_DIR} is not on your PATH — add it to your shell profile" >&2 ;;
+esac
+
+echo
+echo "next:  opp init && opp scan"

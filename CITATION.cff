@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+title: "opportunity-engine: finding and winning paid work from free sources, for a market screened by machines"
+message: "If you use this software, please cite it."
+type: software
+authors:
+  - family-names: "Seyedkazemi Ardebili"
+    given-names: "Mohsen"
+    orcid: "https://orcid.org/0000-0002-1166-6559"
+    website: "https://mskazemi.github.io"
+repository-code: "https://github.com/MSKazemi/opportunity-engine"
+url: "https://github.com/MSKazemi/opportunity-engine"
+abstract: >-
+  opportunity-engine finds, ranks and helps win paid work of any shape — employment,
+  contract, freelance projects, fellowships and collaborations — using only sources
+  that are usable with no payment. It stores opportunities in schema.org/JobPosting
+  shape and the candidate profile as JSON Resume, on the premise that hiring is now
+  screened by two machines in sequence (a parsing layer and a language-model ranking
+  layer) and that machine-legible, verifiable evidence is the interface. Every source
+  in its registry records how and when it was verified, and the tool never fabricates
+  a field it cannot fill truthfully from the user's own profile.
+keywords:
+  - job-search
+  - freelance
+  - applicant-tracking-system
+  - ats
+  - json-resume
+  - schema-org
+  - automation
+  - cli
+license: Apache-2.0
+version: 0.1.0
+date-released: "2026-08-15"

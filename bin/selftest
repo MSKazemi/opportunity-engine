@@ -1,0 +1,218 @@
+#!/usr/bin/env python3
+# Copyright 2026 Mohsen Seyedkazemi Ardebili
+# SPDX-License-Identifier: Apache-2.0
+# Part of opportunity-engine — https://github.com/MSKazemi/opportunity-engine
+"""selftest — prove the engine works without a network, a key, or an account.
+
+Normalisers are checked against fixtures captured from the real APIs, so a
+vendor changing a field name fails here rather than silently producing rows with
+empty titles. Anything that genuinely needs the network is reported as skipped,
+never quietly passed.
+
+    bin/selftest          run everything
+    bin/selftest --net    also re-verify the live sources (needs a network)
+"""
+
+from __future__ import annotations
+
+import json
+import sqlite3
+import sys
+import tempfile
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / "libexec"))
+
+from oe import paths, scan, sources, store  # noqa: E402
+
+FIXTURES = REPO / "tests" / "fixtures"
+GREEN, RED, YELLOW, OFF = "\033[32m", "\033[31m", "\033[33m", "\033[0m"
+
+PASS = FAIL = SKIP = 0
+
+
+def ok(name: str) -> None:
+    global PASS
+    PASS += 1
+    print(f"  {GREEN}✓{OFF} {name}")
+
+
+def bad(name: str, detail: str = "") -> None:
+    global FAIL
+    FAIL += 1
+    print(f"  {RED}✗{OFF} {name}")
+    if detail:
+        print(f"      {detail}")
+
+
+def skip(name: str, why: str) -> None:
+    global SKIP
+    SKIP += 1
+    print(f"  {YELLOW}-{OFF} {name} (skipped: {why})")
+
+
+def check(name: str, expected, actual) -> None:
+    ok(name) if expected == actual else bad(name, f"expected [{expected}], got [{actual}]")
+
+
+def group(title: str) -> None:
+    print(f"\n{title}")
+
+
+# --------------------------------------------------------------------------- #
+group("source registry")
+
+registry = sources.load()
+allsrc = sources.all_sources(registry)
+check("registry parses", True, isinstance(allsrc, list) and len(allsrc) > 0)
+check("every source has an id", [], [s for s in allsrc if not s.get("id")])
+check("ids are unique", len(allsrc), len({s["id"] for s in allsrc}))
+check("every source records how it was verified", [],
+      [s["id"] for s in allsrc if not s.get("verified", {}).get("method")])
+check("no source claims http verification without a status", [],
+      [s["id"] for s in allsrc
+       if s.get("verified", {}).get("method") == "http" and "status" not in s["verified"]])
+check("every source declares its free terms", [],
+      [s["id"] for s in allsrc if "free" not in s])
+
+paid = [s for s in allsrc if not sources.is_free(s)]
+check("paid sources are excluded by --free-only", 0,
+      len([s for s in sources.filter_sources(allsrc, free_only=True) if s in paid]))
+check("key-holding sources are excluded by --no-key", [],
+      [s["id"] for s in sources.filter_sources(allsrc, no_key=True) if sources.needs_key(s)])
+check("filtering by region narrows the list", True,
+      len(sources.filter_sources(allsrc, region="dach")) < len(allsrc))
+
+per_company = [s for s in allsrc if (s.get("access") or {}).get("per_company")]
+check("per-company boards are flagged, not guessed from the URL", True,
+      all("{" in (s.get("access") or {}).get("endpoint", "") for s in per_company))
+check("a per-company board asks for a sample rather than inventing one", "needs-sample",
+      sources.check({"id": "x", "access": {"endpoint": "https://e/{company}", "per_company": True}})["verdict"])
+check("a keyed source is reported, not silently skipped", "needs-key",
+      sources.check({"id": "x", "access": {"endpoint": "https://e", "key_required": True}})["verdict"])
+
+# --------------------------------------------------------------------------- #
+group("normalisers (fixtures captured from the real APIs)")
+
+CASES = [
+    ("greenhouse", "greenhouse.json", "gitlab"),
+    ("ashby", "ashby.json", "ramp"),
+    ("arbeitnow", "arbeitnow.json", ""),
+    ("remotive", "remotive.json", ""),
+    ("remoteok", "remoteok.json", ""),
+    ("jobicy", "jobicy.json", ""),
+    ("himalayas", "himalayas.json", ""),
+]
+
+for source_id, filename, target in CASES:
+    path = FIXTURES / filename
+    if not path.exists():
+        skip(f"{source_id} normaliser", f"no fixture at {path}")
+        continue
+    rows = list(scan.NORMALISERS[source_id](json.loads(path.read_text()), target))
+    if not rows:
+        bad(f"{source_id} normaliser produces rows", "0 rows from the fixture")
+        continue
+    missing_title = [r for r in rows if not r.get("title")]
+    missing_url = [r for r in rows if not r.get("url")]
+    if missing_title:
+        bad(f"{source_id} normaliser fills title", f"{len(missing_title)}/{len(rows)} rows have none")
+    elif missing_url:
+        bad(f"{source_id} normaliser fills url", f"{len(missing_url)}/{len(rows)} rows have none")
+    elif any(r["source"] != source_id for r in rows):
+        bad(f"{source_id} normaliser stamps its own source", "")
+    else:
+        ok(f"{source_id} normaliser: {len(rows)} row(s), title + url on each")
+
+wwr = FIXTURES / "weworkremotely.xml"
+if wwr.exists():
+    try:
+        rows = list(scan._weworkremotely(wwr.read_bytes()))
+        check("weworkremotely RSS normaliser", True, len(rows) > 0 and bool(rows[0]["title"]))
+    except Exception as err:  # noqa: BLE001 - the fixture is the thing under test
+        bad("weworkremotely RSS normaliser", f"{type(err).__name__}: {err}")
+else:
+    skip("weworkremotely RSS normaliser", "no fixture")
+
+check("html is reduced to readable text", "Senior SRE We need you",
+      scan.text_of("<h1>Senior SRE</h1><p>We&nbsp;need   you</p>"))
+check("an empty description stays empty rather than becoming noise", "", scan.text_of(None))
+
+# --------------------------------------------------------------------------- #
+group("deduplication")
+
+fp = store.fingerprint
+check("legal-form suffixes do not split a company",
+      fp("ACME GmbH", "Senior SRE"), fp("ACME", "Senior SRE"))
+check("gender markers in a title do not split a role",
+      fp("ACME", "Senior SRE (m/w/d)"), fp("ACME", "Senior SRE"))
+check("case and spacing do not split a role",
+      fp("ACME", "Senior  SRE"), fp("acme", "senior sre"))
+check("a different role is a different job",
+      False, fp("ACME", "Senior SRE") == fp("ACME", "Staff SRE"))
+check("the same role in another city is another job",
+      False, fp("ACME", "SRE", "Berlin") == fp("ACME", "SRE", "Munich"))
+
+# --------------------------------------------------------------------------- #
+group("store lifecycle")
+
+with tempfile.TemporaryDirectory() as tmp:
+    workspace = paths.ensure_workspace(Path(tmp) / ".opp")
+    check("init creates the workspace", True, (workspace / "profile").is_dir())
+
+    con = store.connect(paths.db_path(workspace))
+    row = {"source": "test", "url": "https://e/1", "title": "Senior SRE", "org": "ACME GmbH",
+           "location": "Berlin", "description": "k8s"}
+    check("a new opportunity is new", "new", store.upsert(con, row))
+    check("the same posting again is known", "known", store.upsert(con, row))
+    check("the same job at another URL is a duplicate", "duplicate",
+          store.upsert(con, {**row, "url": "https://other/9", "org": "ACME"}))
+    check("a genuinely different job is new", "new",
+          store.upsert(con, {**row, "url": "https://e/2", "title": "Staff SRE"}))
+
+    counts = store.counts(con)
+    check("the duplicate is closed, not left to be applied to twice", 1, counts.get("closed", 0))
+    check("only the real openings are actionable", 2, counts.get("new", 0))
+
+    con.execute("UPDATE opportunities SET state='applied' WHERE title='Senior SRE' AND source='test'")
+    con.commit()
+    store.upsert(con, row)
+    state = con.execute("SELECT state FROM opportunities WHERE url='https://e/1'").fetchone()["state"]
+    check("a re-scan never resets a state you moved by hand", "applied", state)
+
+    check("every event is logged", True,
+          con.execute("SELECT COUNT(*) c FROM events").fetchone()["c"] >= 3)
+    con.close()
+
+    reopened = sqlite3.connect(paths.db_path(workspace))
+    check("the store survives being closed and reopened", 3,
+          reopened.execute("SELECT COUNT(*) FROM opportunities").fetchone()[0])
+    reopened.close()
+
+# --------------------------------------------------------------------------- #
+group("scan control flow (no network)")
+
+rows, report = scan.scan_source("greenhouse", target=None)
+check("a per-company board without a target says so", "needs-target", report["status"])
+rows, report = scan.scan_source("not-a-real-source")
+check("an unknown source is named, not ignored", "unknown-source", report["status"])
+rows, report = scan.scan_source("linkedin")
+check("a source with no key-free feed says why", "not-scannable", report["status"])
+
+# --------------------------------------------------------------------------- #
+group("network")
+
+if "--net" in sys.argv:
+    results = [sources.check(s) for s in allsrc
+               if (s.get("access") or {}).get("endpoint")
+               and not (s.get("access") or {}).get("key_required")
+               and not (s.get("access") or {}).get("per_company")]
+    failing = [r for r in results if r["verdict"] not in ("ok", "needs-sample", "not-callable")]
+    check("every key-free endpoint still answers", [], [f["id"] for f in failing])
+else:
+    skip("live source verification", "pass --net to check the real endpoints")
+
+# --------------------------------------------------------------------------- #
+print(f"\n{PASS} passed, {FAIL} failed, {SKIP} skipped")
+sys.exit(1 if FAIL else 0)

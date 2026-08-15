@@ -1,0 +1,306 @@
+#!/usr/bin/env python3
+# Copyright 2026 Mohsen Seyedkazemi Ardebili
+# SPDX-License-Identifier: Apache-2.0
+# Part of opportunity-engine — https://github.com/MSKazemi/opportunity-engine
+"""opp — the command line for opportunity-engine.
+
+    opp init                 make this directory a workspace
+    opp sources              what can be searched, and what it costs
+    opp scan                 pull opportunities from the key-free sources
+    opp list                 what is in the workspace
+    opp doctor               is this set up to actually work
+
+Everything writes to the workspace, never to the installed copy.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "libexec"))
+
+from oe import __version__, paths, scan, sources, store  # noqa: E402
+
+GREEN, RED, YELLOW, DIM, OFF = "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[0m"
+
+
+def emit(rows: list[dict], as_json: bool) -> None:
+    if as_json:
+        print(json.dumps(rows, indent=2, ensure_ascii=False))
+
+
+# --------------------------------------------------------------------------- #
+
+def cmd_init(args) -> int:
+    root = Path(args.path).resolve() if args.path else Path.cwd()
+    workspace = paths.ensure_workspace(root / paths.WORKSPACE_MARKER)
+    print(f"workspace: {workspace}")
+    store.connect(paths.db_path(workspace)).close()
+    print(f"store:     {paths.db_path(workspace)}")
+    profile = paths.profile_path(workspace)
+    if not profile.exists():
+        print(f"\nNo profile yet. The engine can find work without one, but it cannot")
+        print(f"match or apply. Create it from whatever you already have:")
+        print(f"  opp ingest path/to/cv.pdf path/to/resume.json ...")
+    return 0
+
+
+def cmd_sources(args) -> int:
+    registry = sources.load()
+    rows = sources.filter_sources(
+        sources.all_sources(registry),
+        free_only=args.free_only, kind=args.kind, region=args.region,
+        opportunity_type=args.type, no_key=args.no_key,
+        automatable=True if args.automatable else None)
+
+    if args.json:
+        emit(rows, True)
+        return 0
+
+    print(f"{len(rows)} source(s)   registry updated {registry['updated']}\n")
+    for source in rows:
+        free = source.get("free", {})
+        capacity = free.get("capacity")
+        period = free.get("capacity_period")
+        if capacity is None:
+            allowance = "no published cap"
+        elif capacity == 0:
+            allowance = "cannot apply on the free tier"
+        else:
+            allowance = f"{capacity}/{period}"
+
+        stale = sources.staleness(source)
+        method = source.get("verified", {}).get("method", "?")
+        if method == "http":
+            mark = f"{GREEN}verified{OFF}"
+        elif method in ("operator", "documented"):
+            mark = f"{YELLOW}{method}{OFF}"
+        else:
+            mark = f"{RED}unverified{OFF}"
+        age = f"{stale}d ago" if stale is not None else "never"
+
+        scannable = "scan" if source["id"] in scan.SCANNABLE else "    "
+        print(f"  {source['id']:<18} {scannable}  {source['kind']:<22} {allowance:<28} {mark} ({age})")
+        if args.long:
+            print(f"      {DIM}{source['name']} — {', '.join(source.get('opportunity_types', []))}"
+                  f" · {', '.join(source.get('regions', []))}{OFF}")
+            if source.get("why_it_matters"):
+                print(f"      {DIM}{source['why_it_matters']}{OFF}")
+    print(f"\n{DIM}'scan' = has a key-free feed this tool can read directly."
+          f" The rest need a browser and a human-held login.{OFF}")
+    return 0
+
+
+def cmd_sources_check(args) -> int:
+    registry = sources.load()
+    targets = ([sources.get(args.id, registry)] if args.id
+               else sources.all_sources(registry))
+    targets = [t for t in targets if t]
+    if not targets:
+        print(f"no such source: {args.id}", file=sys.stderr)
+        return 2
+
+    bad = 0
+    for source in targets:
+        result = sources.check(source, sample=args.sample, timeout=args.timeout)
+        verdict = result["verdict"]
+        colour = {"ok": GREEN, "http-error": RED, "unreachable": RED}.get(verdict, DIM)
+        detail = result.get("note") or f"HTTP {result.get('status')} · {result.get('bytes')} bytes"
+        print(f"  {colour}{verdict:<13}{OFF} {source['id']:<18} {detail}")
+        if verdict in ("http-error", "unreachable"):
+            bad += 1
+    print(f"\n{len(targets)} checked, {bad} failing")
+    return 1 if bad else 0
+
+
+def cmd_scan(args) -> int:
+    workspace = paths.find_workspace()
+    if not workspace.exists():
+        print("no workspace here — run: opp init", file=sys.stderr)
+        return 2
+    con = store.connect(paths.db_path(workspace))
+
+    registry = sources.load()
+    if args.source:
+        wanted = [(args.source, args.target)]
+    else:
+        # Everything with a key-free feed that is not a per-company board. The
+        # per-company ones need `--source greenhouse --target <company>`, because
+        # "every Greenhouse board on earth" is not a thing anyone can enumerate.
+        free_feeds = [s["id"] for s in sources.filter_sources(
+            sources.all_sources(registry), free_only=True, no_key=True)
+            if s["id"] in scan.SCANNABLE and not (s.get("access") or {}).get("per_company")]
+        wanted = [(sid, None) for sid in free_feeds]
+
+    totals = {"new": 0, "duplicate": 0, "known": 0}
+    for source_id, target in wanted:
+        rows, report = scan.scan_source(source_id, target, limit=args.limit, registry=registry)
+        outcomes = {"new": 0, "duplicate": 0, "known": 0}
+        for row in rows:
+            outcomes[store.upsert(con, row)] += 1
+        for key in totals:
+            totals[key] += outcomes[key]
+        con.commit()
+        store.record_scan(con, source=source_id, target=target or "",
+                          status=report["status"], fetched=report.get("fetched", 0),
+                          new_rows=outcomes["new"], duplicates=outcomes["duplicate"],
+                          detail=report.get("detail", ""))
+        con.commit()
+
+        if report["status"] == "ok":
+            print(f"  {GREEN}ok{OFF}    {source_id:<16} {report['fetched']:>4} fetched  "
+                  f"{outcomes['new']:>4} new  {outcomes['duplicate']:>3} dup  "
+                  f"{outcomes['known']:>4} already seen")
+        else:
+            print(f"  {RED}{report['status']}{OFF}  {source_id:<16} {report.get('detail', '')[:80]}")
+
+    print(f"\n{totals['new']} new opportunit(ies), {totals['duplicate']} same job under another URL")
+    if totals["new"]:
+        print("next:  opp list --state new")
+    con.close()
+    return 0
+
+
+def cmd_list(args) -> int:
+    con = store.connect(paths.db_path())
+    rows = store.search(con, state=args.state, source=args.source,
+                        limit=args.limit, order=args.order)
+    if args.json:
+        print(store.dump(rows))
+        return 0
+    if not rows:
+        print("nothing here yet — run: opp scan")
+        return 0
+    for row in rows:
+        score = f"{row['score']:.2f}" if row["score"] is not None else "  – "
+        remote = "remote" if row["remote"] else (row["location"] or "")[:22]
+        print(f"  {row['id']}  {score}  {row['state']:<11} {(row['org'] or '?')[:26]:<26} "
+              f"{row['title'][:44]:<44} {DIM}{remote}{OFF}")
+    print(f"\n{len(rows)} shown · {DIM}opp show <id>{OFF}")
+    con.close()
+    return 0
+
+
+def cmd_show(args) -> int:
+    con = store.connect(paths.db_path())
+    row = con.execute("SELECT * FROM opportunities WHERE id = ?", (args.id,)).fetchone()
+    if row is None:
+        print(f"no opportunity {args.id}", file=sys.stderr)
+        return 2
+    if args.json:
+        print(json.dumps(dict(row), indent=2, ensure_ascii=False))
+        return 0
+    print(f"{row['title']}\n{row['org']}  ·  {row['location'] or '—'}  ·  {row['source']}")
+    print(f"{row['url']}\n")
+    print(f"state: {row['state']}   posted: {row['posted_at'] or '—'}")
+    if row["salary_min"]:
+        print(f"pay:   {row['salary_min']:.0f}–{row['salary_max'] or 0:.0f} "
+              f"{row['salary_currency']} / {row['salary_period'] or '?'}")
+    body = row["description"] or "(no description came with this posting)"
+    print("\n" + (body if args.full else body[:1200] + ("…" if len(body) > 1200 else "")))
+    con.close()
+    return 0
+
+
+def cmd_doctor(args) -> int:
+    problems: list[str] = []
+    workspace = paths.find_workspace()
+    print(f"workspace: {workspace}{'' if workspace.exists() else '  (not created — run opp init)'}")
+    if not workspace.exists():
+        problems.append("no workspace")
+
+    profile = paths.profile_path(workspace)
+    print(f"profile:   {'present' if profile.exists() else 'missing — scan works, match and apply do not'}")
+    if not profile.exists():
+        problems.append("no profile")
+
+    registry = sources.load()
+    allsrc = sources.all_sources(registry)
+    free = [s for s in allsrc if sources.is_free(s)]
+    scannable = [s for s in allsrc if s["id"] in scan.SCANNABLE]
+    stale = [s for s in allsrc
+             if (sources.staleness(s) or 10**6) > sources.STALE_DAYS]
+    print(f"sources:   {len(allsrc)} known · {len(free)} free · {len(scannable)} directly scannable")
+    if stale:
+        print(f"           {YELLOW}{len(stale)} row(s) unverified for over {sources.STALE_DAYS} days"
+              f"{OFF} — re-check with: opp sources check")
+
+    if workspace.exists():
+        con = store.connect(paths.db_path(workspace))
+        counts = store.counts(con)
+        total = sum(counts.values())
+        print(f"store:     {total} opportunit(ies) " +
+              (", ".join(f"{k}={v}" for k, v in sorted(counts.items())) if counts else ""))
+        con.close()
+
+    if problems:
+        print(f"\n{YELLOW}not ready:{OFF} " + ", ".join(problems))
+        return 1
+    print(f"\n{GREEN}ready{OFF}")
+    return 0
+
+
+# --------------------------------------------------------------------------- #
+
+def main() -> int:
+    parser = argparse.ArgumentParser(prog="opp", description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--version", action="version", version=f"opportunity-engine {__version__}")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p = sub.add_parser("init", help="make a workspace here")
+    p.add_argument("path", nargs="?")
+    p.set_defaults(func=cmd_init)
+
+    p = sub.add_parser("sources", help="where opportunities can be found, and what each costs")
+    p.add_argument("--free-only", action="store_true", help="only what needs no card")
+    p.add_argument("--no-key", action="store_true", help="only what needs no API key")
+    p.add_argument("--kind")
+    p.add_argument("--region")
+    p.add_argument("--type", help="employment, freelance, contract, grant, …")
+    p.add_argument("--automatable", action="store_true")
+    p.add_argument("--long", "-l", action="store_true")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_sources)
+
+    p = sub.add_parser("sources-check", help="re-verify sources by actually calling them")
+    p.add_argument("--id")
+    p.add_argument("--sample", help="company slug for a per-company board")
+    p.add_argument("--timeout", type=int, default=30)
+    p.set_defaults(func=cmd_sources_check)
+
+    p = sub.add_parser("scan", help="pull opportunities from the key-free sources")
+    p.add_argument("--source", help="one source id (default: every key-free feed)")
+    p.add_argument("--target", help="company slug, for a per-company board")
+    p.add_argument("--limit", type=int, default=200)
+    p.set_defaults(func=cmd_scan)
+
+    p = sub.add_parser("list", help="what is in the workspace")
+    p.add_argument("--state", help=f"one of: {', '.join(store.STATES)}")
+    p.add_argument("--source")
+    p.add_argument("--limit", type=int, default=40)
+    p.add_argument("--order", default="score", choices=("score", "date", "org"))
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_list)
+
+    p = sub.add_parser("show", help="one opportunity in full")
+    p.add_argument("id")
+    p.add_argument("--full", action="store_true")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_show)
+
+    p = sub.add_parser("doctor", help="is this set up to actually work")
+    p.set_defaults(func=cmd_doctor)
+
+    args = parser.parse_args()
+    return args.func(args)
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.exit(130)
