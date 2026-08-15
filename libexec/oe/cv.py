@@ -257,6 +257,10 @@ def compile_pdf(tex_path: Path) -> tuple[bool, str]:
     if result.returncode != 0:
         tail = result.stdout.decode("utf-8", "replace")[-800:]
         return False, f"{engine} failed:\n{tail}"
+    # LaTeX scatters .aux/.log/.out next to the output. An application folder is
+    # something a person opens and reads; build litter makes it look unfinished.
+    for suffix in (".aux", ".log", ".out", ".toc"):
+        tex_path.with_suffix(suffix).unlink(missing_ok=True)
     return True, str(tex_path.with_suffix(".pdf"))
 
 

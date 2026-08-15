@@ -22,8 +22,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "libexec"))
 
-from oe import (__version__, cv, ingest, match, paths,  # noqa: E402
-                profile as profile_mod, scan, sources, store)
+from oe import (__version__, apply as apply_mod, cv, ingest, match,  # noqa: E402
+                paths, profile as profile_mod, scan, sources, store)
 
 GREEN, RED, YELLOW, DIM, OFF = "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[0m"
 
@@ -274,6 +274,93 @@ def cmd_cv(args) -> int:
     return 0
 
 
+def cmd_apply(args) -> int:
+    loaded = profile_mod.load()
+    if loaded is None:
+        print("no profile — run: opp ingest <files>", file=sys.stderr)
+        return 2
+    workspace = paths.find_workspace()
+    constraints = paths.load_config()
+    lex = match.lexicon()
+    con = store.connect(paths.db_path(workspace))
+
+    if args.id:
+        rows = [con.execute("SELECT * FROM opportunities WHERE id = ?", (args.id,)).fetchone()]
+        if rows[0] is None:
+            print(f"no opportunity {args.id}", file=sys.stderr)
+            return 2
+    else:
+        rows = list(con.execute(
+            "SELECT * FROM opportunities WHERE state = 'screened' AND score IS NOT NULL "
+            "ORDER BY score DESC LIMIT ?", (args.top,)))
+    if not rows:
+        print("nothing to prepare — run: opp match", file=sys.stderr)
+        return 2
+
+    prepared = 0
+    for row in rows:
+        posting = dict(row)
+        report = match.match(loaded, posting, constraints, lex)
+        if report["verdict"] == "knocked-out" and not args.force:
+            print(f"  {RED}skipped{OFF} {posting['title'][:46]:<46} "
+                  f"{report['knockouts'][0]['why']}")
+            continue
+        if (report["fit"] or 0) < constraints["min_fit"] and not args.force:
+            print(f"  {DIM}skipped{OFF} {posting['title'][:46]:<46} "
+                  f"below your min_fit of {constraints['min_fit']}")
+            continue
+
+        result = apply_mod.build_package(loaded, posting, report, workspace,
+                                         with_pdf=not args.no_pdf)
+        prepared += 1
+        print(f"\n{GREEN}prepared{OFF} {posting['title']}")
+        print(f"  {result['package']}")
+        print(f"  {DIM}posting.md · letter.md · form-answers.md · "
+              f"{Path(result['cv']['tex']).name}"
+              f"{' · ' + Path(result['cv']['pdf']).name if result['cv'].get('pdf') else ''}"
+              f" · fleet-task.json{OFF}")
+
+        for warning in result["letter_warnings"]:
+            print(f"  {YELLOW}!{OFF} {warning}")
+        if result["cv_lint"]:
+            print(f"  {RED}!{OFF} the CV contains text that looks like private notes:")
+            for problem in result["cv_lint"][:4]:
+                print(f"      {problem}")
+        if result["unanswered"]:
+            print(f"  {YELLOW}{len(result['unanswered'])} form field(s) only you can answer{OFF}: "
+                  f"{', '.join(result['unanswered'][:5])}")
+
+        con.execute("UPDATE opportunities SET state = 'drafted', updated_at = ? WHERE id = ?",
+                    (store.now(), posting["id"]))
+        store.log(con, posting["id"], "drafted", result["package"])
+    con.commit()
+    con.close()
+
+    if prepared:
+        print(f"\n{prepared} package(s) prepared. {RED}Nothing has been sent.{OFF}")
+        print(f"{DIM}Read each one, write the opening line of the letter yourself, then submit."
+              f"\nAfterwards record it with the confirmation you actually saw:"
+              f"\n  opp applied <id> --evidence \"confirmation #12345 shown on screen\"{OFF}")
+    return 0
+
+
+def cmd_applied(args) -> int:
+    """Record a real submission. Evidence is not optional here."""
+    con = store.connect(paths.db_path())
+    row = con.execute("SELECT * FROM opportunities WHERE id = ?", (args.id,)).fetchone()
+    if row is None:
+        print(f"no opportunity {args.id}", file=sys.stderr)
+        return 2
+    con.execute("UPDATE opportunities SET state = ?, state_reason = ?, updated_at = ? WHERE id = ?",
+                ("blocked" if args.blocked else "applied", args.evidence, store.now(), args.id))
+    store.log(con, args.id, "blocked" if args.blocked else "applied", args.evidence)
+    con.commit()
+    con.close()
+    verb = "blocked" if args.blocked else "applied"
+    print(f"{GREEN}{verb}{OFF}  {row['title']}  —  {args.evidence}")
+    return 0
+
+
 def cmd_sources(args) -> int:
     registry = sources.load()
     rows = sources.filter_sources(
@@ -511,6 +598,21 @@ def main() -> int:
     p.add_argument("--out", help="output directory (default: the workspace)")
     p.add_argument("--no-pdf", action="store_true", help="write .tex only")
     p.set_defaults(func=cmd_cv)
+
+    p = sub.add_parser("apply", help="assemble application packages (it never submits)")
+    p.add_argument("--id", help="one opportunity")
+    p.add_argument("--top", type=int, default=5, help="how many of the best matches")
+    p.add_argument("--force", action="store_true",
+                   help="prepare even a knocked-out or low-fit role")
+    p.add_argument("--no-pdf", action="store_true")
+    p.set_defaults(func=cmd_apply)
+
+    p = sub.add_parser("applied", help="record a submission you actually made")
+    p.add_argument("id")
+    p.add_argument("--evidence", required=True,
+                   help="the confirmation the system returned — required, and not a formality")
+    p.add_argument("--blocked", action="store_true", help="record a wall instead of a submission")
+    p.set_defaults(func=cmd_applied)
 
     p = sub.add_parser("sources", help="where opportunities can be found, and what each costs")
     p.add_argument("--free-only", action="store_true", help="only what needs no card")

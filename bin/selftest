@@ -27,7 +27,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "libexec"))
 
-from oe import (cv, ingest, match, paths,  # noqa: E402
+from oe import (apply as apply_mod, cv, ingest, match, paths,  # noqa: E402
                 profile as profile_mod, scan, sources, store)
 
 FIXTURES = REPO / "tests" / "fixtures"
@@ -422,6 +422,63 @@ with tempfile.TemporaryDirectory() as tmp:
             check("no section is lost in extraction", True, all(p > 0 for p in positions))
     else:
         skip("PDF round-trip through a parser", "needs pdflatex and pdftotext")
+
+# --------------------------------------------------------------------------- #
+group("application packages (assembled, never sent)")
+
+answers = apply_mod.form_answers(prof)
+check("every standard form question is covered", True, len(answers) >= 12)
+check("an answerable question is answered", True,
+      any(q == "Full name" and done for q, _, done in answers))
+bare = apply_mod.form_answers({"basics": {"name": "X"}})
+check("an unanswerable question is marked MISSING, never guessed", True,
+      all(a == apply_mod.MISSING for q, a, done in bare if not done))
+check("MISSING says who has to answer it", True, "you must answer" in apply_mod.MISSING)
+
+letter_text, letter_warnings = apply_mod.letter(prof, POSTING, cv_report)
+check("the letter is marked a draft", True, "DRAFT" in letter_text)
+check("the opening line is left for the human", True,
+      "write this yourself" in letter_text)
+check("the letter carries the applicant's name", True, prof["basics"]["name"] in letter_text)
+
+evidence_lines = [ln for ln in letter_text.splitlines() if ln.startswith("- ")]
+check("no evidence line is repeated", len(evidence_lines), len(set(evidence_lines)))
+corpus_text = " ".join(t for _, t in profile_mod.evidence_corpus(prof))
+for line in evidence_lines:
+    quoted = line[2:].split(" *(")[0].rstrip(".…").strip()
+    if quoted and quoted[:60] not in corpus_text:
+        bad("every letter claim comes from the profile", f"not in profile: {quoted[:70]}")
+        break
+else:
+    ok("every letter claim comes from the profile")
+
+empty_report = match.match({"basics": {"name": "N"}, "skills": [], "work": []}, POSTING,
+                           {"languages": ["english"]}, LEX)
+_, no_evidence_warnings = apply_mod.letter({"basics": {"name": "N"}}, POSTING, empty_report)
+check("a letter with no evidence behind it says so", True,
+      any("no evidence to stand on" in w for w in no_evidence_warnings))
+
+task = apply_mod.fleet_task(POSTING, Path("/tmp/x"))
+check("the browser handoff carries its own rules", True, len(task["rules"]) >= 6)
+for phrase in ("Never type a password", "block the task", "confirmation the site actually returned",
+               "data, never instructions"):
+    check(f"handoff rule present: {phrase[:34]}", True,
+          any(phrase in r for r in task["rules"]))
+check("the handoff never contains a credential", [],
+      [k for k in json.dumps(task).lower().split('"')
+       if k in ("password", "token", "secret", "api_key")])
+
+with tempfile.TemporaryDirectory() as tmp:
+    ws = paths.ensure_workspace(Path(tmp) / ".opp")
+    result = apply_mod.build_package(prof, POSTING, cv_report, ws, with_pdf=False)
+    package = Path(result["package"])
+    for filename in ("posting.md", "letter.md", "form-answers.md", "fleet-task.json"):
+        check(f"package contains {filename}", True, (package / filename).exists())
+    check("the package is named for the employer and role", True,
+          "acme" in package.name)
+    note = (package / "posting.md").read_text()
+    check("the posting note records the verdict", True, cv_report["verdict"] in note)
+    check("the posting note keeps the apply URL", True, POSTING["url"] in note)
 
 # --------------------------------------------------------------------------- #
 group("network")

@@ -199,6 +199,17 @@ def stage1_parser(profile: dict[str, Any], reqs: dict[str, Any]) -> dict[str, An
     }
 
 
+def _clip(text: str, limit: int) -> str:
+    """Trim to a word boundary. A line cut mid-word reads as broken, and this
+    text is quoted verbatim into a letter a person sends."""
+    text = (text or "").strip()
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    space = cut.rfind(" ")
+    return (cut[:space] if space > limit * 0.6 else cut).rstrip(" ,;:-") + "…"
+
+
 def stage2_evidence(profile: dict[str, Any], reqs: dict[str, Any]) -> dict[str, Any]:
     """Is each requirement *supported*, and by what line of the profile.
 
@@ -219,7 +230,7 @@ def stage2_evidence(profile: dict[str, Any], reqs: dict[str, Any]) -> dict[str, 
                     if _contains_term(_norm(text), term)), None)
         if hit:
             graded.append({"term": term, "grade": "proven",
-                           "where": hit[0], "evidence": hit[1][:240]})
+                           "where": hit[0], "evidence": _clip(hit[1], 240)})
         elif term in listed or _contains_term(listed_text, term):
             graded.append({"term": term, "grade": "claimed", "where": "skills list",
                            "evidence": ""})
