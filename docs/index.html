@@ -232,6 +232,7 @@ opp scan --limit 80</code></pre>
     <tr><td><code>opp match</code> — two-stage scoring with per-requirement evidence</td><td>working</td></tr>
     <tr><td><code>opp cv</code> — parser-safe LaTeX to PDF, tailored by reordering only</td><td>working</td></tr>
     <tr><td><code>opp apply</code> — assembles the package; never submits</td><td>working</td></tr>
+    <tr><td><code>opp apply --fleet</code> — queues the packages for parallel filling</td><td>working</td></tr>
   </tbody>
 </table>
 </div>
@@ -255,6 +256,15 @@ opp scan --limit 80</code></pre>
   possible, and an application submitted without your review carries your name. It assembles the
   package and stops at anything that needs a human.</p>
 
+<h3>Can it fill applications on several platforms in parallel?</h3>
+<p>Yes. <code>opp apply --top 10 --fleet</code> prepares the packages and queues them for
+  <a href="https://github.com/MSKazemi/agent-fleet">agent-fleet</a>, which opens as many parallel
+  sessions as the work and your machine justify — capped at one worker per host, so ten postings
+  across three boards become three terminals rather than ten tabs against one site. A worker fills
+  the form, screenshots it, and stops: every task ends awaiting your approval, and nothing is ever
+  submitted on your behalf. agent-fleet is optional; without it the tasks are written to a batch
+  file instead.</p>
+
 <h3>Will it write my CV for me?</h3>
 <p>It will generate a tailored, parseable CV from facts already in your profile. It will not invent
   experience, dates or numbers to improve a match score. If the profile does not support a claim,
@@ -262,8 +272,8 @@ opp scan --limit 80</code></pre>
 
 <h3>Is it production-ready?</h3>
 <p>The discovery half is: it is tested, it runs in seconds, and it is what the author uses. Matching,
-  CV generation and the apply flow are not built yet. The status table above is kept honest
-  deliberately.</p>
+  CV generation and the apply flow are built and covered by the selftest, but are younger and have
+  seen less real-world use. The status table above is kept honest deliberately.</p>
 
 </main>
 

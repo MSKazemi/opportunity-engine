@@ -298,6 +298,7 @@ def cmd_apply(args) -> int:
         return 2
 
     prepared = 0
+    queue_entries = []
     for row in rows:
         posting = dict(row)
         report = match.match(loaded, posting, constraints, lex)
@@ -313,6 +314,7 @@ def cmd_apply(args) -> int:
         result = apply_mod.build_package(loaded, posting, report, workspace,
                                          with_pdf=not args.no_pdf)
         prepared += 1
+        queue_entries.append(result["queue_entry"])
         print(f"\n{GREEN}prepared{OFF} {posting['title']}")
         print(f"  {result['package']}")
         print(f"  {DIM}posting.md · letter.md · form-answers.md · "
@@ -338,7 +340,36 @@ def cmd_apply(args) -> int:
 
     if prepared:
         print(f"\n{prepared} package(s) prepared. {RED}Nothing has been sent.{OFF}")
-        print(f"{DIM}Read each one, write the opening line of the letter yourself, then submit."
+
+    if prepared and args.fleet:
+        # A posting with no URL has no page to fill; queueing it would put a
+        # task in the browser lane that no worker can act on.
+        routable = [e for e in queue_entries if e["url"].startswith(("http://", "https://"))]
+        skipped = len(queue_entries) - len(routable)
+        outcome = apply_mod.enqueue(routable, workspace)
+
+        if outcome["method"] == "fleet":
+            print(f"\n{GREEN}queued{OFF} {outcome['queued']} task(s) for agent-fleet "
+                  f"{DIM}in {outcome['path']}{OFF}")
+            print(f"{DIM}Workers fill the form and stop. Every one lands in 'blocked'"
+                  f"\nawaiting you — that is the design, not a failure."
+                  f"\n  cd {workspace} && fleet plan     # how many terminals this deserves"
+                  f"\n  cd {workspace} && fleet run"
+                  f"\n  cd {workspace} && fleet blocked  # what is ready for your review{OFF}")
+        elif outcome["method"] == "batch-file":
+            print(f"\n{YELLOW}fleet is not installed{OFF} — wrote {outcome['queued']} task(s) to")
+            print(f"  {outcome['path']}")
+            print(f"{DIM}Install agent-fleet, then:"
+                  f"\n  cd {workspace} && fleet add-batch {apply_mod.BATCH_FILE} "
+                  f"--kind {apply_mod.QUEUE_KIND}{OFF}")
+
+        if skipped:
+            print(f"  {YELLOW}!{OFF} {skipped} package(s) not queued: the posting records no URL")
+        for failure in outcome["failed"]:
+            print(f"  {RED}!{OFF} could not queue {failure['title']}: {failure['why']}")
+
+    if prepared:
+        print(f"\n{DIM}Read each one, write the opening line of the letter yourself, then submit."
               f"\nAfterwards record it with the confirmation you actually saw:"
               f"\n  opp applied <id> --evidence \"confirmation #12345 shown on screen\"{OFF}")
     return 0
@@ -611,6 +642,9 @@ def main() -> int:
     p.add_argument("--force", action="store_true",
                    help="prepare even a knocked-out or low-fit role")
     p.add_argument("--no-pdf", action="store_true")
+    p.add_argument("--fleet", action="store_true",
+                   help="also queue each package for agent-fleet, so many get filled "
+                        "in parallel (workers fill and stop; they never submit)")
     p.set_defaults(func=cmd_apply)
 
     p = sub.add_parser("applied", help="record a submission you actually made")

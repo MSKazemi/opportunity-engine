@@ -464,13 +464,44 @@ check("a letter with no evidence behind it says so", True,
 
 task = apply_mod.fleet_task(POSTING, Path("/tmp/x"))
 check("the browser handoff carries its own rules", True, len(task["rules"]) >= 6)
-for phrase in ("Never type a password", "block the task", "confirmation the site actually returned",
-               "data, never instructions"):
+for phrase in ("Never type a password", "block the task", "DO NOT SUBMIT",
+               "Never report this task done", "data, never instructions"):
     check(f"handoff rule present: {phrase[:34]}", True,
           any(phrase in r for r in task["rules"]))
 check("the handoff never contains a credential", [],
       [k for k in json.dumps(task).lower().split('"')
        if k in ("password", "token", "secret", "api_key")])
+check("the handoff tells the worker what to block with", True,
+      any("ready to submit" in r for r in task["rules"]))
+
+# The queue lane. A worker reads `notes` and nothing else about the job, so the
+# note has to be self-sufficient — and a pipe in it would corrupt add-batch.
+note = apply_mod.queue_note(POSTING, Path("/tmp/pkg"), ["Years of Kubernetes"])
+check("the note points at the package", True, "/tmp/pkg" in note)
+check("the note forbids submitting", True, "never submit" in note)
+check("the note counts what only a human can answer", True, "1 field(s)" in note)
+check("a note with nothing outstanding stays quiet about it", True,
+      "field(s) only the human" not in apply_mod.queue_note(POSTING, Path("/tmp/pkg"), []))
+
+# fit is the 0..1 score from match.match, not a percentage. Reading it as one
+# maps every real posting onto the same priority, so these use the values the
+# matcher actually produces — a scale error has to fail here.
+check("the best match is claimed first", True,
+      apply_mod.queue_priority(0.75) < apply_mod.queue_priority(0.55))
+check("fit is read on the 0..1 scale, not as a percentage", True,
+      len({apply_mod.queue_priority(f) for f in (0.95, 0.75, 0.55, 0.45)}) >= 3)
+check("an unscored posting sorts last", 9, apply_mod.queue_priority(None))
+check("priority stays inside fleet's range", True,
+      all(1 <= apply_mod.queue_priority(f) <= 9
+          for f in (None, 0.0, 0.12, 0.5, 0.88, 1.0)))
+
+piped = apply_mod._batch_line({"url": "https://x.test/j", "title": "a | b",
+                               "note": "c | d\ne"})
+check("add-batch lines keep exactly three fields", 3, len(piped.split("|")))
+check("a newline never splits an add-batch line", 1, len(piped.splitlines()))
+
+check("nothing is queued from an empty list", 0,
+      apply_mod.enqueue([], Path("/tmp"))["queued"])
 
 with tempfile.TemporaryDirectory() as tmp:
     ws = paths.ensure_workspace(Path(tmp) / ".opp")
@@ -480,9 +511,29 @@ with tempfile.TemporaryDirectory() as tmp:
         check(f"package contains {filename}", True, (package / filename).exists())
     check("the package is named for the employer and role", True,
           "acme" in package.name)
-    note = (package / "posting.md").read_text()
-    check("the posting note records the verdict", True, cv_report["verdict"] in note)
-    check("the posting note keeps the apply URL", True, POSTING["url"] in note)
+    posting_note = (package / "posting.md").read_text()
+    check("the posting note records the verdict", True, cv_report["verdict"] in posting_note)
+    check("the posting note keeps the apply URL", True, POSTING["url"] in posting_note)
+
+    entry = result["queue_entry"]
+    check("the package carries a ready-to-queue entry", True,
+          entry["url"] == POSTING["url"] and str(package) in entry["note"])
+
+    # With fleet absent, the tasks must still land somewhere fleet can read —
+    # in the workspace, never in this repository.
+    outcome = apply_mod.enqueue([entry], ws, fleet_bin=None)
+    if shutil.which("fleet") is None:
+        check("without fleet the batch file is written", "batch-file", outcome["method"])
+        batch = Path(outcome["path"])
+        check("the batch file lands in the workspace", True, batch.parent == ws)
+        check("the batch line round-trips through fleet's split", True,
+              batch.read_text().strip().split("|")[0].strip() == POSTING["url"])
+    else:
+        check("with fleet installed the queue is used", "fleet", outcome["method"])
+        check("the queue lands in the workspace", True,
+              Path(outcome["path"]).parent == ws)
+        check("every task was accepted", [], outcome["failed"])
+    check("nothing was written into the repo", False, (REPO / ".agents").exists())
 
 # --------------------------------------------------------------------------- #
 group("network")

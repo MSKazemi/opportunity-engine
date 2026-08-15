@@ -145,6 +145,7 @@ This is **v0.4**. What is real is marked real; nothing here is aspirational.
 | `opp match` — two-stage scoring, per-requirement evidence, knockouts | **working** |
 | `opp cv` — parser-safe LaTeX → PDF, tailored by reordering only | **working** |
 | `opp apply` — assembles the package; never submits | **working** |
+| `opp apply --fleet` — queues the packages for parallel filling | **working** |
 
 ---
 
@@ -162,6 +163,35 @@ This is **v0.4**. What is real is marked real; nothing here is aspirational.
   in a posting addressed at an automated reader is reported, not obeyed.
 - **It will not silently claim success.** An application is `applied` only with the confirmation
   the system actually returned.
+
+---
+
+## Filling many forms at once
+
+Ten packages is ten forms to fill by hand. `--fleet` hands them to
+[agent-fleet](https://github.com/MSKazemi/agent-fleet), which runs as many parallel
+sessions as the work and the machine actually justify:
+
+```bash
+opp apply --top 10 --fleet    # prepare ten packages, and queue ten tasks
+fleet plan                    # how many terminals this deserves, and why
+fleet run                     # go
+fleet blocked                 # what is ready for you
+```
+
+`fleet plan` caps one worker per host, so ten postings across three boards become three
+terminals rather than ten tabs against one site. Best fit is claimed first.
+
+**A worker fills the form and stops.** It never clicks submit. Every task ends in fleet's
+`blocked` lane with a screenshot of the completed form and the reason
+`ready to submit: <org> — <title>`, and you clear them in batches. That is the design, not
+a limitation: sending an application is a human act with your name on it, and the same rule
+that stops the tool inventing a salary figure stops it pressing send. Anything behind a
+login, CAPTCHA or 2FA parks the same way, with the wall named.
+
+agent-fleet is optional. Without it, `--fleet` writes `fleet-batch.txt` into the workspace
+in `fleet add-batch` format and tells you the command; opportunity-engine keeps its
+stdlib-only, zero-dependency install either way.
 
 ---
 
@@ -222,7 +252,8 @@ absent.
 [gitlab.com/mskazemi](https://gitlab.com/mskazemi)
 
 Built alongside [agent-fleet](https://github.com/MSKazemi/agent-fleet), which is how the
-browser-driven half of `opp apply` runs many sessions in parallel without thrashing the machine.
+browser-driven half of `opp apply` runs many sessions in parallel without thrashing the machine —
+see [Filling many forms at once](#filling-many-forms-at-once).
 
 ## License
 

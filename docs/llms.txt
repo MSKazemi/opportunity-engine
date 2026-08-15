@@ -48,6 +48,8 @@ The candidate profile is JSON Resume; opportunities are stored in schema.org/Job
 - `opp match` — two-stage scoring against a posting, with the evidence for each requirement
 - `opp cv` — a one-column, parser-safe LaTeX/PDF CV, tailored by reordering only
 - `opp apply` — assemble an application package (CV, letter draft, form answers); it never submits
+- `opp apply --fleet` — queue those packages for agent-fleet, so many forms are filled in
+  parallel; workers fill and stop at a screenshot, and every task ends awaiting human approval
 - `opp applied` — record a submission you made, with the confirmation you saw
 - `opp list` / `opp show` — read what was found
 - `opp doctor` — report whether the setup can actually work
