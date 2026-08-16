@@ -22,8 +22,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "libexec"))
 
-from oe import (__version__, apply as apply_mod, cv, ingest, match,  # noqa: E402
-                paths, profile as profile_mod, scan, sources, store)
+from oe import (__version__, apply as apply_mod, cv, inbox as inbox_mod,  # noqa: E402
+                ingest, match, paths, profile as profile_mod, scan, sources, store)
 
 GREEN, RED, YELLOW, DIM, OFF = "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[0m"
 
@@ -423,6 +423,61 @@ def cmd_applied(args) -> int:
     return 0
 
 
+def cmd_inbox(args) -> int:
+    """Find the confirmations that arrived by email for applications already sent."""
+    workspace = paths.find_workspace()
+    con = store.connect(paths.db_path(workspace))
+    targets = inbox_mod.awaiting(con, window_days=args.days)
+    con.close()
+
+    if not targets:
+        print(f"{DIM}nothing is awaiting confirmation in the last {args.days} day(s).{OFF}")
+        print(f"{DIM}Applications appear here once `opp apply` has prepared them and nothing "
+              f"has been recorded as sent.{OFF}")
+        return 0
+
+    scope = inbox_mod.search_scope(targets)
+    print(f"{len(targets)} application(s) awaiting confirmation\n")
+    for t in targets:
+        print(f"  {t['id']}  {t.get('org','?')[:24]:<24} {t.get('title','?')[:40]:<40} "
+              f"{DIM}{', '.join(t['senders']) or 'no domain resolved'}{OFF}")
+
+    # Anyone about to let an agent near their mail should see the boundary first.
+    print(f"\n{YELLOW}what a reconciler would be allowed to read{OFF}")
+    print(f"  after       {scope['after']}")
+    print(f"  from        {', '.join(scope['from_domains']) or '(none resolved)'}")
+    print(f"  or subject  {', '.join(scope['subject_any_of'][:6]) or '(none)'}")
+    print(f"  {DIM}nothing else in the mailbox is opened, and nothing is ever replied to,"
+          f"\n  labelled, archived or deleted. Links are never clicked — activation links and"
+          f"\n  one-time codes stay with you.{OFF}")
+
+    if not args.fleet:
+        print(f"\n{DIM}to have an agent do it:  opp inbox --fleet{OFF}")
+        return 0
+
+    task = inbox_mod.reconcile_task(targets)
+    note = (f"Read {workspace}/.opp inbox-check task. " + " ".join(task["rules"][:3]))
+    outcome = apply_mod.enqueue([{
+        "url": task["title"],          # agent-lane tasks carry text, not a URL
+        "title": task["title"],
+        "note": note,
+        "priority": 4,
+        "kind": inbox_mod.QUEUE_KIND,
+        "exec": "agent",
+    }], workspace)
+
+    spec = workspace / "inbox-check.json"
+    spec.write_text(json.dumps(task, indent=2, ensure_ascii=False))
+    print(f"\n{GREEN}queued{OFF} 1 reconciler in the {DIM}agent{OFF} lane "
+          f"{DIM}(no terminal, no Chrome tab){OFF}")
+    print(f"  full scope and rules: {spec}")
+    if outcome["method"] == "batch-file":
+        print(f"  {YELLOW}fleet is not installed{OFF} — written to {outcome['path']}")
+    for failure in outcome["failed"]:
+        print(f"  {RED}!{OFF} {failure['why']}")
+    return 0
+
+
 def cmd_sources(args) -> int:
     registry = sources.load()
     rows = sources.filter_sources(
@@ -682,6 +737,13 @@ def main() -> int:
     p.add_argument("--no-auto-submit", dest="auto_submit", action="store_false",
                    help="fill and stop, whatever the config says")
     p.set_defaults(func=cmd_apply)
+
+    p = sub.add_parser("inbox", help="find email confirmations for applications already sent")
+    p.add_argument("--days", type=int, default=inbox_mod.DEFAULT_WINDOW_DAYS,
+                   help="how far back to look (default: %(default)s)")
+    p.add_argument("--fleet", action="store_true",
+                   help="queue one reconciler in the agent lane — no terminal, no Chrome tab")
+    p.set_defaults(func=cmd_inbox)
 
     p = sub.add_parser("applied", help="record a submission you actually made")
     p.add_argument("id")

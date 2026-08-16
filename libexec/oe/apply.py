@@ -273,6 +273,10 @@ def fleet_task(posting: dict[str, Any], package: Path, *,
             "number, a success banner, or the resulting URL, quoted. If you cannot see one, "
             "you do not know whether it sent: block with what you did see. Never infer success "
             "from the button having been clicked.",
+            f"Once — and only once — you have a real confirmation, record it in the tool's own "
+            f"records too: opp applied {posting.get('id','<id>')} --evidence \"<what you saw>\". "
+            f"The fleet queue and the opportunity store are two different books; a submission "
+            f"written in only one of them is a gap someone has to reconcile by hand later.",
         ]
     else:
         rules += [
@@ -399,10 +403,16 @@ def enqueue(entries: list[dict[str, Any]], workspace: Path,
     env = {**os.environ, "AGENT_ROOT": str(workspace)}
     queued, failed = 0, []
     for entry in entries:
+        # A task with no page to open belongs in the agent lane, where it costs
+        # no terminal and no Chrome tab. fleet infers `browser` from an http URL,
+        # so anything else has to say so explicitly.
+        cmd = [binary, "add", entry["url"], "--title", entry["title"],
+               "--note", entry["note"], "--kind", entry.get("kind", QUEUE_KIND),
+               "--priority", str(entry["priority"])]
+        if entry.get("exec"):
+            cmd += ["--exec", entry["exec"]]
         proc = subprocess.run(
-            [binary, "add", entry["url"], "--title", entry["title"],
-             "--note", entry["note"], "--kind", QUEUE_KIND,
-             "--priority", str(entry["priority"])],
+            cmd,
             capture_output=True, text=True, env=env, cwd=str(workspace), check=False)
         if proc.returncode == 0:
             queued += 1

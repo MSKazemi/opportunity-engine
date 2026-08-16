@@ -37,7 +37,7 @@ The candidate profile is JSON Resume; opportunities are stored in schema.org/Job
 - Storage: a local SQLite file in a workspace directory you own; nothing is uploaded anywhere
 - Sources: 27 recorded, 13 verified live by HTTP request on 2026-08-15
 - Cost: every enabled source is usable with no card attached; paid sources are recorded and flagged
-- Self-test: 172 checks that need no network, no API key and no account
+- Self-test: 189 checks that need no network, no API key and no account
 
 ## Commands
 
@@ -56,6 +56,12 @@ The candidate profile is JSON Resume; opportunities are stored in schema.org/Job
   capped by auto_submit_max. It never waives the interlocks: an unanswerable field, private notes in
   the CV, a knocked-out posting, a login/CAPTCHA/2FA, or a submit with no visible confirmation all
   still stop and wait for the human
+- `opp inbox` — find email confirmations for applications already sent, and record them. Runs as a
+  subagent in agent-fleet's agent lane (no terminal, no browser tab). The mailbox search is bounded
+  by where the user actually applied: after the earliest pending application, from the ATS domains
+  applied through, or a subject naming those employers. It never clicks a link, never follows an
+  activation link, never retrieves a one-time code or PIN, never opens an attachment, and never
+  replies, forwards, labels, archives or deletes
 - `opp applied` — record a submission you made, with the confirmation you saw
 - `opp list` / `opp show` — read what was found
 - `opp doctor` — report whether the setup can actually work

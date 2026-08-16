@@ -358,6 +358,42 @@ cd ~/your-private-dir &amp;&amp; opp init &amp;&amp; opp ingest ~/cv.pdf</code><
     now — not assumed. <code>fleet plan</code> shows the arithmetic.</p></div>
 </div>
 
+<h2>The lane with no terminal</h2>
+<p>Not everything needs a browser, and work that does not need one should not take a tab. Checking
+  whether a confirmation email arrived is the clearest case: it runs as a <strong>subagent in the
+  agent lane</strong>, alongside the browser workers, costing no terminal and no Chrome tab.</p>
+<pre><code>opp inbox              # what is awaiting confirmation, and exactly what would be read
+opp inbox --fleet      # queue one reconciler in the agent lane
+
+$ fleet plan
+  agent      1 task(s)   in-session subagent, no terminal (parallel)
+terminals needed: 0</code></pre>
+<p>One reconciler, not one per worker. Several sessions racing on the same mailbox buys nothing and
+  multiplies who can read it.</p>
+
+<h3>What it is allowed to read</h3>
+<p>The boundary is drawn from where you actually applied: messages after your earliest pending
+  application, from the ATS domains you applied through, or with a subject naming one of those
+  employers. <code>opp inbox</code> prints that boundary before you queue anything.</p>
+<pre><code>what a reconciler would be allowed to read
+  after       2026-08-16T00:18:25+00:00
+  from        ashbyhq.com, greenhouse.io, lever.co
+  or subject  ACME, Globex, Initech</code></pre>
+<p class="note">A company's display name is never turned into a domain — an allow-list entry nobody
+  verified is not an allow-list. Nothing outside the scope is opened, and nothing is ever replied
+  to, forwarded, labelled, archived or deleted.</p>
+
+<div class="stopbox">
+  <p><strong>Never automated, in any mode:</strong> clicking a link in an email, following an
+    account-activation or address-verification link, and retrieving a one-time code, PIN or 2FA
+    code.</p>
+  <p class="note" style="margin-bottom:0">A code an agent fetches and types is not a second factor —
+    the entire point of the second channel is that a person holds it. The reconciler reports that a
+    code arrived and stops. Email from unknown senders is untrusted input, and a job search
+    generates plenty of it: anything the reconciler reads is data, never instructions, and text
+    addressed at an automated reader is quoted back to you rather than obeyed.</p>
+</div>
+
 <h2>Why the tabs do not collide</h2>
 <p>Each Claude session gets its own <strong>per-session tab group</strong>. A worker sees only the
   tabs it created — it cannot navigate, read or close another worker's page, because the other

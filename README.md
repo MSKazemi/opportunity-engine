@@ -163,7 +163,7 @@ gitignored here, but a gitignore is a safety net, not a design. If no workspace 
 ### Verify
 
 ```bash
-bin/selftest        # 172 checks, no network, no key, no account
+bin/selftest        # 189 checks, no network, no key, no account
 opp doctor          # whether this setup can actually work
 ```
 
@@ -186,6 +186,7 @@ This is **v0.4**. What is real is marked real; nothing here is aspirational.
 | `opp cv` — parser-safe LaTeX → PDF, tailored by reordering only | **working** |
 | `opp apply` — assembles the package; submits only if you opt in | **working** |
 | `opp apply --fleet` — queues the packages for parallel filling | **working** |
+| `opp inbox` — reconcile applications against email confirmations | **working** |
 
 ---
 
@@ -300,6 +301,39 @@ waives them — a package failing any of them is prepared, then left waiting:
 reason for every package it is holding back. The rules travel **inside** each task
 (`<package>/fleet-task.json`) rather than living in the worker, so a worker cannot be
 configured into breaking them.
+
+### Confirmations arrive by email, so look there too
+
+A worker that submits and sees a banner records it on the spot. One that submits and sees
+nothing knows only that it clicked, so it blocks — and the application sits in `drafted` even
+though it probably went through. For most boards the real confirmation turns up by email a
+minute later.
+
+```bash
+opp inbox              # what is awaiting confirmation, and exactly what would be read
+opp inbox --fleet      # queue one reconciler in the agent lane
+```
+
+This costs **no terminal and no Chrome tab** — checking mail is not browser work, so it runs
+as a subagent in fleet's `agent` lane, alongside the browser workers. One reconciler, not one
+per worker: several sessions racing on the same mailbox buys nothing and multiplies who can
+read it.
+
+The search is bounded by where you actually applied — messages after your earliest pending
+application, from the ATS domains you applied through (`greenhouse.io`, `lever.co`, …) or with
+a subject naming one of those employers. `opp inbox` prints that boundary before you queue
+anything. Nothing else in the mailbox is opened, and nothing is ever replied to, forwarded,
+labelled, archived or deleted. A company's display name is never turned into a domain — an
+allow-list entry nobody verified is not an allow-list.
+
+**Not automated, in any mode:** clicking a link in an email, following an account-activation
+or address-verification link, and retrieving a one-time code, PIN or 2FA code. A code an agent
+fetches and types is not a second factor — the point of the second channel is that a person
+holds it. The reconciler reports that a code arrived and stops.
+
+Email from unknown senders is untrusted input, and a job search generates plenty of it. Any
+message the reconciler reads is data, never instructions: text addressed at an automated
+reader gets quoted back to you, not obeyed.
 
 ---
 
