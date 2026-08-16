@@ -171,6 +171,39 @@ def contacts_from_text(text: str) -> dict[str, Any]:
     return {"basics": basics} if basics else {}
 
 
+def strip_annotations(node: Any, trail: str = "") -> tuple[Any, list[str]]:
+    """A profile with every `_`-prefixed key removed, and the list of what went.
+
+    Underscore keys are the source system's marginalia — editorial notes, "do not
+    claim this" warnings, provenance, paths back into whatever repository the CV
+    was assembled in. JSON Resume has no such fields and nothing here reads one,
+    so their only possible destination is a rendered document going to a stranger.
+    A real one seen in the wild pointed at a private repository path and named an
+    internal memory file; `cv.lint` caught it at the last moment. Dropping them at
+    the door is the earlier and better place — but never silently, because a note
+    a person wrote is a note they may want back.
+    """
+    dropped: list[str] = []
+    if isinstance(node, dict):
+        clean = {}
+        for key, value in node.items():
+            where = f"{trail}.{key}" if trail else key
+            if key.startswith("_"):
+                dropped.append(where)
+                continue
+            clean[key], gone = strip_annotations(value, where)
+            dropped.extend(gone)
+        return clean, dropped
+    if isinstance(node, list):
+        out = []
+        for index, value in enumerate(node):
+            item, gone = strip_annotations(value, f"{trail}[{index}]")
+            out.append(item)
+            dropped.extend(gone)
+        return out, dropped
+    return node, dropped
+
+
 def ingest_file(path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     """Read one document. Returns (profile fragment, report).
 
@@ -185,7 +218,16 @@ def ingest_file(path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
         data = json.loads(path.read_text(errors="replace"))
         if _looks_like_json_resume(data):
             report["kind"] = "json-resume"
+            data, annotations = strip_annotations(data)
             report["extracted"] = [k for k in data if data.get(k)]
+            if annotations:
+                report["dropped"] = annotations
+                report["todo"].append(
+                    f"{len(annotations)} private annotation(s) were left behind, not merged: "
+                    f"{', '.join(annotations[:4])}"
+                    f"{f' (+{len(annotations) - 4} more)' if len(annotations) > 4 else ''}. "
+                    "Underscore keys are notes to yourself; they have no place in a document "
+                    "an employer reads. They are still in the source file if you want them")
             return data, report
         if _looks_like_linkedin(data):
             report["kind"] = "linkedin-export"

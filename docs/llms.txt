@@ -35,9 +35,12 @@ The candidate profile is JSON Resume; opportunities are stored in schema.org/Job
 - Language: Python 3, standard library only, plus curl at runtime
 - Install: git clone, then bin/install — no package manager required
 - Storage: a local SQLite file in a workspace directory you own; nothing is uploaded anywhere
-- Sources: 27 recorded, 13 verified live by HTTP request on 2026-08-15
+- Sources: 27 recorded, 13 verified live by HTTP request on 2026-08-15; users add their own
+  in a workspace file that is merged over the shipped registry
+- Any site the tool cannot parse can still be used: `opp add` takes postings collected by a
+  person or an agent and holds them to the same validation, deduplication and state rules
 - Cost: every enabled source is usable with no card attached; paid sources are recorded and flagged
-- Self-test: 189 checks that need no network, no API key and no account
+- Self-test: 254 checks that need no network, no API key and no account
 
 ## Commands
 

@@ -110,6 +110,75 @@ posted to four boards under four URLs, and applying twice through two channels i
 not applying once — on freelance boards it reads as a supplier dispute and the client usually
 drops the candidate.
 
+### Sources it cannot read — bring the postings yourself
+
+Nine payload shapes are parsed here. The web has thousands, most behind a login, and writing a
+parser per vendor does not converge. So there is a second door: anything that can read a page —
+you, a script, or an agent driving a browser — can hand postings over.
+
+```bash
+echo '[{"url":"https://…","title":"MLOps Engineer","org":"Acme","location":"Bologna",
+        "description":"…","posted_at":"2026-08-16"}]' | opp add --source linkedin
+```
+
+Rows arriving this way are held to exactly the checks a scanned row is: the same plausibility
+validator, the same `(org, title, location)` deduplication, and the same refusal to let the
+caller name its own `state`, `score` or `id`. Those are **earned** — by matching, and by a
+confirmation someone actually saw. A collector that could post `state: applied` could write an
+application history that never happened, which is the one thing this tool exists not to do.
+
+A collected posting is then a first-class row — `match` scores it, `cv build` tailors for it,
+`apply` packages it. It keeps `source_ref: collected` for good, so a lead nobody verified is
+never mistaken for one that came from a checked feed.
+
+### Your own sources
+
+The shipped registry is something you pull updates to, so your additions live beside your data
+instead — in `.opp/sources.local.json`, merged over it by `id`. Nothing you add is ever in the
+repository, so no `git pull` is a merge conflict and no private endpoint is one `git add -A`
+away from a public remote.
+
+```bash
+opp sources-add --id my-board --name "Some Board" --kind aggregator \
+                --endpoint 'https://example.com/api/jobs?limit={n}'
+opp sources-add --id himalayas --max-rows 20     # patch one field of a shipped row
+opp sources-add --id arbeitnow --disable         # mute it; the row stays, greyed out
+opp sources-add --id my-board --remove           # drop yours — the shipped row returns
+opp sources --local                              # only what you added or patched
+```
+
+An **unknown** id is appended. A **known** id is patched field by field, so fixing one number
+does not mean restating forty lines — and a shipped fix to the rest of the row still reaches you
+on the next pull. Rows you touched are marked `+local` or `~patched` in `opp sources`, because a
+number you are about to trust should be traceable to whoever asserted it.
+
+> **Patching an endpoint drops the inherited `verified` block, on purpose.** The registry's one
+> real promise is that every row records how and when it was checked. A row that kept
+> `status: 200` from a URL nobody has called since would be exactly the rumour this file exists
+> to keep out. Re-earn it with `opp sources-check --id <id>`, or supply your own `verified`
+> block if you checked it yourself. Clamping `max_rows` does *not* invalidate anything — it
+> changes the query string, not the host that answers it.
+
+Registering a source makes it **known and checkable**, not automatically scannable: reading a
+new feed also needs a normaliser for that vendor's payload shape in `scan.py`. `opp sources-add`
+tells you which of the two you have.
+
+### Your rules
+
+```bash
+opp rules                                          # what is currently enforced
+opp rules --set min_fit=0.55
+opp rules --add exclude_countries='united states'
+opp rules --add exclude_signals=clearance
+opp rules --remove exclude_countries='united states'
+```
+
+These knock a match out rather than merely penalising it, so a typo in one fails silently — it
+does not error, it just quietly stops protecting you. Values are therefore checked on the way
+in: `min_fit=high` is refused, and `exclude_signals` accepts only the five signals the matcher
+actually understands. `auto_submit_requires` is not settable here, which is what keeps it from
+being a preference.
+
 ---
 
 ## Requirements
@@ -187,6 +256,11 @@ This is **v0.4**. What is real is marked real; nothing here is aspirational.
 | `opp apply` — assembles the package; submits only if you opt in | **working** |
 | `opp apply --fleet` — queues the packages for parallel filling | **working** |
 | `opp inbox` — reconcile applications against email confirmations | **working** |
+| `opp add` — take postings an agent or a person collected, same checks as a scan | **working** |
+| `opp sources-add` — your own boards, merged over the shipped registry | **working** |
+| `opp rules` — read and change your hard limits, with the values checked | **working** |
+| Per-company ATS sweeps from a curated company list | **not built** — `--target` works, the list does not exist |
+| Freelance-marketplace lanes (freelance.de, Free-Work, Contra) | **not built** — human-driven, no automation path |
 
 ---
 

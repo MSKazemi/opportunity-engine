@@ -32,16 +32,113 @@ USER_AGENT = "opportunity-engine/0.1 (+https://github.com/MSKazemi/opportunity-e
 STALE_DAYS = 30
 
 
-def load(path: Path | None = None) -> dict[str, Any]:
-    return json.loads((path or (paths.DATA / "sources.json")).read_text())
+#: Patching any of these means the endpoint that was verified is not the endpoint
+#: that will now be called, so the inherited `verified` block no longer describes
+#: anything real. `max_rows` is deliberately absent: clamping a row count changes
+#: the query string but not what host answers it, and the prior check still holds.
+VERIFICATION_CRITICAL = ("endpoint", "auth", "key_required")
 
 
-def all_sources(registry: dict[str, Any] | None = None) -> list[dict[str, Any]]:
-    return (registry or load())["sources"]
+def _deep_merge(base: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
+    """Patch over base, recursing into nested dicts.
+
+    Lists are replaced wholesale, not concatenated: `walls: []` has to be able to
+    mean "this one has no walls", which an append would make unsayable.
+    """
+    out = dict(base)
+    for key, value in patch.items():
+        if isinstance(value, dict) and isinstance(out.get(key), dict):
+            out[key] = _deep_merge(out[key], value)
+        else:
+            out[key] = value
+    return out
+
+
+def _patch_row(base: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
+    """One shipped row with the user's overlay applied over it."""
+    merged = _deep_merge(base, patch)
+    merged["_origin"] = "patched"
+
+    access_patch = patch.get("access") or {}
+    base_access = base.get("access") or {}
+    rewired = [k for k in VERIFICATION_CRITICAL
+               if k in access_patch and access_patch[k] != base_access.get(k)]
+    # An overlay that carries its own `verified` block is a user saying "I checked
+    # this myself" — that is exactly the claim the field is for, so it stands.
+    if rewired and "verified" not in patch:
+        merged["verified"] = {
+            "date": None, "method": "unverified",
+            "note": f"inherited verification dropped — your overlay changed {', '.join(rewired)}; "
+                    f"run `opp sources-check --id {base.get('id', '?')}` to prove this one",
+        }
+    return merged
+
+
+def merge_registry(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
+    """The shipped registry with a user overlay merged over it, by `id`.
+
+    Three behaviours, and the reason there are three: an *unknown* id is appended,
+    because adding a board is the common case. A *known* id is patched field by
+    field, so fixing one number does not mean restating forty lines — and so a
+    shipped fix to the rest of the row still arrives on the next pull. And
+    `"disabled": true` mutes a row without deleting it, because a source you
+    turned off for being noisy is not the same as one you never had.
+    """
+    rows: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    for source in base.get("sources", []):
+        rows[source["id"]] = {**source, "_origin": "shipped"}
+        order.append(source["id"])
+
+    for patch in overlay.get("sources", []):
+        sid = patch.get("id")
+        if not sid:
+            continue
+        if sid in rows:
+            rows[sid] = _patch_row(rows[sid], patch)
+        else:
+            rows[sid] = {**patch, "_origin": "local"}
+            order.append(sid)
+
+    return {**base, "sources": [rows[sid] for sid in order]}
+
+
+def load(path: Path | None = None, *, overlay: bool | Path = True) -> dict[str, Any]:
+    """The registry as this workspace sees it.
+
+    `overlay=False` gives the shipped registry alone — what the project ships,
+    with nobody's local edits in it.
+    """
+    registry = json.loads((path or (paths.DATA / "sources.json")).read_text())
+    if overlay is False:
+        return registry
+
+    local = overlay if isinstance(overlay, Path) else paths.local_sources_path()
+    try:
+        patch = json.loads(local.read_text())
+    except (OSError, ValueError):
+        # No overlay, or one that is not valid JSON. A broken personal file must
+        # not take the shipped registry down with it; `opp sources-check` is
+        # where it gets reported as broken.
+        return merge_registry(registry, {})
+    return merge_registry(registry, patch)
+
+
+def is_disabled(source: dict[str, Any]) -> bool:
+    return bool(source.get("disabled"))
+
+
+def all_sources(registry: dict[str, Any] | None = None, *,
+                include_disabled: bool = False) -> list[dict[str, Any]]:
+    rows = (registry or load())["sources"]
+    return rows if include_disabled else [s for s in rows if not is_disabled(s)]
 
 
 def get(source_id: str, registry: dict[str, Any] | None = None) -> dict[str, Any] | None:
-    for source in all_sources(registry):
+    # Includes disabled rows on purpose: asking for a source by name should find
+    # the one that exists and let the caller say "that one is switched off",
+    # rather than report it missing and send someone hunting for a typo.
+    for source in all_sources(registry, include_disabled=True):
         if source["id"] == source_id:
             return source
     return None

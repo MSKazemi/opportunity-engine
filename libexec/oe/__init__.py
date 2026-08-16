@@ -2,4 +2,4 @@
 # SPDX-License-Identifier: Apache-2.0
 """opportunity-engine — find, match and win paid work of any shape."""
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"

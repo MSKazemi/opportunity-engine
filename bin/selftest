@@ -16,6 +16,7 @@ never quietly passed.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import sqlite3
@@ -67,7 +68,10 @@ def group(title: str) -> None:
 # --------------------------------------------------------------------------- #
 group("source registry")
 
-registry = sources.load()
+# overlay=False on purpose: these assert what the PROJECT ships. Reading the
+# tester's own workspace overlay here would make the suite pass or fail based on
+# whichever boards they happen to have added.
+registry = sources.load(overlay=False)
 allsrc = sources.all_sources(registry)
 check("registry parses", True, isinstance(allsrc, list) and len(allsrc) > 0)
 check("every source has an id", [], [s for s in allsrc if not s.get("id")])
@@ -617,6 +621,229 @@ with tempfile.TemporaryDirectory() as tmp:
               Path(outcome["path"]).parent == ws)
         check("every task was accepted", [], outcome["failed"])
     check("nothing was written into the repo", False, (REPO / ".agents").exists())
+
+# --------------------------------------------------------------------------- #
+group("local source overlay")
+
+BASE = {"updated": "2026-08-15", "sources": [
+    {"id": "alpha", "kind": "aggregator",
+     "access": {"endpoint": "https://alpha.test/j?limit={n}", "auth": "none",
+                "key_required": False},
+     "apply": {"channel": "redirect", "walls": ["login"]},
+     "verified": {"date": "2026-08-15", "method": "http", "status": 200}},
+    {"id": "beta", "kind": "ats-board",
+     "access": {"endpoint": "https://beta.test/{board}", "per_company": True},
+     "verified": {"date": "2026-08-15", "method": "http", "status": 200}},
+]}
+
+merged = sources.merge_registry(BASE, {"sources": [{"id": "gamma", "kind": "aggregator"}]})
+ids = [s["id"] for s in merged["sources"]]
+check("an unknown id is appended", ["alpha", "beta", "gamma"], ids)
+check("shipped rows keep their order", ["alpha", "beta"], ids[:2])
+check("an added row is marked local", "local", merged["sources"][2]["_origin"])
+check("shipped rows are marked shipped", "shipped", merged["sources"][0]["_origin"])
+check("the shipped registry is not mutated", 2, len(BASE["sources"]))
+
+patched = sources.merge_registry(BASE, {"sources": [
+    {"id": "alpha", "access": {"max_rows": 20}}]})["sources"][0]
+check("a known id is patched, not duplicated", 2,
+      len(sources.merge_registry(BASE, {"sources": [{"id": "alpha"}]})["sources"]))
+check("patching keeps fields the overlay did not mention",
+      "https://alpha.test/j?limit={n}", patched["access"]["endpoint"])
+check("patching merges into nested dicts", 20, patched["access"]["max_rows"])
+check("a patched row is marked patched", "patched", patched["_origin"])
+# max_rows changes the query string, not what host answers it, so the prior
+# check still describes something real.
+check("clamping rows keeps the verification", "http", patched["verified"]["method"])
+
+rewired = sources.merge_registry(BASE, {"sources": [
+    {"id": "alpha", "access": {"endpoint": "https://elsewhere.test/j"}}]})["sources"][0]
+check("rewiring the endpoint drops the inherited verification",
+      "unverified", rewired["verified"]["method"])
+check("a dropped verification carries no date", None, rewired["verified"]["date"])
+keyed = sources.merge_registry(BASE, {"sources": [
+    {"id": "alpha", "access": {"key_required": True}}]})["sources"][0]
+check("demanding a key drops the inherited verification",
+      "unverified", keyed["verified"]["method"])
+own = sources.merge_registry(BASE, {"sources": [
+    {"id": "alpha", "access": {"endpoint": "https://mine.test/j"},
+     "verified": {"date": "2026-08-16", "method": "http", "status": 200}}]})["sources"][0]
+check("an overlay may assert its own verification", "http", own["verified"]["method"])
+
+# A list replaced wholesale, so that "this one has no walls" stays sayable.
+nowalls = sources.merge_registry(BASE, {"sources": [
+    {"id": "alpha", "apply": {"walls": []}}]})["sources"][0]
+check("a list is replaced, not appended to", [], nowalls["apply"]["walls"])
+
+muted = sources.merge_registry(BASE, {"sources": [{"id": "alpha", "disabled": True}]})
+check("a muted row is hidden by default", ["beta"],
+      [s["id"] for s in sources.all_sources(muted)])
+check("a muted row is still there when asked for", ["alpha", "beta"],
+      [s["id"] for s in sources.all_sources(muted, include_disabled=True)])
+check("a muted row is still findable by id", True,
+      sources.get("alpha", muted) is not None)
+check("scan refuses a muted source", "disabled",
+      scan.scan_source("alpha", registry=muted)[1]["status"])
+
+check("an overlay row without an id is ignored", ["alpha", "beta"],
+      [s["id"] for s in sources.merge_registry(BASE, {"sources": [{"kind": "x"}]})["sources"]])
+check("an empty overlay changes nothing", ["alpha", "beta"],
+      [s["id"] for s in sources.merge_registry(BASE, {})["sources"]])
+
+with tempfile.TemporaryDirectory() as tmp:
+    ws = paths.ensure_workspace(Path(tmp) / ".opp")
+    overlay_file = paths.local_sources_path(ws)
+    overlay_file.write_text(json.dumps({"sources": [{"id": "zeta", "kind": "aggregator"}]}))
+    layered = sources.load(overlay=overlay_file)
+    check("the overlay file is read from the workspace", True,
+          "zeta" in [s["id"] for s in sources.all_sources(layered)])
+    check("the shipped rows survive the overlay", True,
+          "greenhouse" in [s["id"] for s in sources.all_sources(layered)])
+    # A personal file someone hand-edited into invalid JSON must not take the
+    # whole registry down — every scan reads this path.
+    overlay_file.write_text("{ not json")
+    check("a broken overlay leaves the shipped registry usable",
+          len(allsrc), len(sources.all_sources(sources.load(overlay=overlay_file))))
+    check("a missing overlay is not an error",
+          len(allsrc), len(sources.all_sources(sources.load(overlay=ws / "nope.json"))))
+
+
+# --------------------------------------------------------------------------- #
+group("opportunities collected by an agent")
+
+# The nine normalisers read nine payload shapes; the web has thousands. An agent
+# with a browser reads any of them, so the boundary that matters is not what this
+# program can parse but what may enter the store — and a collected row is held to
+# exactly the checks a scanned one is.
+OPP = str(REPO / "bin" / "opp")
+
+
+def opp_add(ws, payload, extra=()):
+    proc = subprocess.run([sys.executable, OPP, "add", "--json", *extra],
+                          input=json.dumps(payload), capture_output=True, text=True,
+                          env={**os.environ, "OPP_HOME": str(ws)})
+    return json.loads(proc.stdout) if proc.stdout.strip() else {"stderr": proc.stderr}
+
+
+with tempfile.TemporaryDirectory() as tmp:
+    ws = paths.ensure_workspace(Path(tmp) / ".opp")
+    good = {"url": "https://acme.test/1", "title": "MLOps Engineer", "org": "Acme",
+            "location": "Bologna", "description": "Kubernetes and MLflow."}
+
+    result = opp_add(ws, [good])
+    check("a collected posting is stored", 1, result["new"])
+    check("the same posting twice is recognised", 1, opp_add(ws, [good])["known"])
+    check("the same job at another URL is a duplicate", 1,
+          opp_add(ws, [{**good, "url": "https://elsewhere.test/9"}])["duplicate"])
+
+    placeholder = opp_add(ws, [{"url": "https://x.test/2", "title": "name", "org": "name"}])
+    check("a placeholder row is refused", 0, placeholder["new"])
+    check("and the refusal says why", True,
+          "placeholder" in placeholder["rejected"][0]["why"])
+    check("a posting with no url to apply through is refused", 0,
+          opp_add(ws, [{"title": "Ghost", "org": "Nowhere"}])["new"])
+    check("a row that is not an object is refused", 0, opp_add(ws, ["nonsense"])["new"])
+
+    # The one that matters most: a collector must not be able to write an
+    # application history that never happened.
+    faked = opp_add(ws, [{"url": "https://acme.test/3", "title": "Platform Engineer",
+                          "org": "Beta", "state": "applied", "score": 0.99,
+                          "id": "chosen-by-caller"}])
+    check("an asserted state, score and id are all ignored",
+          ["id", "score", "state"], faked["ignored_fields"])
+    check("the row is still stored, just honestly", 1, faked["new"])
+    con = store.connect(paths.db_path(ws))
+    landed = con.execute("SELECT state, score, source, source_ref FROM opportunities "
+                         "WHERE org = 'Beta'").fetchone()
+    check("a collected row starts at new, whatever it claimed", "new", landed["state"])
+    check("a collected row has no score until it is matched", None, landed["score"])
+    check("provenance records that nobody verified this feed", "collected", landed["source_ref"])
+    check("provenance defaults to agent", "agent", landed["source"])
+    con.close()
+
+    check("provenance can be named", "linkedin",
+          (lambda: (opp_add(ws, [{"url": "https://li.test/7", "title": "SRE", "org": "Gamma"}],
+                            ("--source", "linkedin")),
+                    store.connect(paths.db_path(ws)).execute(
+                        "SELECT source FROM opportunities WHERE org='Gamma'").fetchone()[0])[1])())
+
+
+# --------------------------------------------------------------------------- #
+group("rules")
+
+check("a fit score is a number", 0.55, paths.coerce_rule("min_fit", "0.55"))
+check("a flag reads as a flag", False, paths.coerce_rule("auto_submit", "false"))
+check("a flag accepts plain english", True, paths.coerce_rule("auto_submit", "yes"))
+check("a list rule splits on commas", ["english", "italian"],
+      paths.coerce_rule("languages", "english, italian"))
+check("a list member is normalised", "united states",
+      paths.coerce_rule_item("exclude_countries", "'United States'"))
+
+for key, value, why in [
+    ("min_fit", "high", "a fit score that is not a number"),
+    ("min_fit", "5", "a fit score outside 0..1"),
+    ("auto_submit", "maybe", "a flag that is not a flag"),
+    ("auto_submit_max", "-1", "a negative ceiling"),
+]:
+    try:
+        paths.coerce_rule(key, value)
+        bad(f"{why} is refused", "it was accepted")
+    except ValueError:
+        ok(f"{why} is refused")
+
+for key, why in [("auto_submit_requires", "the conditions no setting waives are read-only"),
+                 ("_min_fit", "a documentation key is not a setting"),
+                 ("nonsense", "an unknown rule is refused rather than stored")]:
+    try:
+        paths.coerce_rule(key, "x")
+        bad(why, "it was accepted")
+    except KeyError:
+        ok(why)
+
+try:
+    paths.coerce_rule_item("exclude_signals", "banana")
+    bad("an unknown signal is refused", "it was accepted")
+except ValueError:
+    ok("an unknown signal is refused")
+check("a known signal is accepted", "clearance",
+      paths.coerce_rule_item("exclude_signals", "clearance"))
+
+
+# --------------------------------------------------------------------------- #
+group("private annotations never reach a profile")
+
+DIRTY = {
+    "basics": {"name": "A Person", "email": "a@b.test"},
+    "_provenance": "~/notes/wherever-the-cv-was-assembled.json",
+    "projects": [{"name": "Thing",
+                  "_claimsNote": "see projects/x/growth/CLAIMS.md — do not claim 93%"}],
+    "publications": {"_note": ".claude/memory/feedback.md", "journals": [{"name": "P"}]},
+}
+clean, gone = ingest.strip_annotations(DIRTY)
+check("an underscore key at the top is dropped", False, "_provenance" in clean)
+check("an underscore key inside a list item is dropped", False,
+      "_claimsNote" in clean["projects"][0])
+check("an underscore key nested in a dict is dropped", False,
+      "_note" in clean["publications"])
+check("real content is untouched", "Thing", clean["projects"][0]["name"])
+check("a sibling of a dropped key survives", 1, len(clean["publications"]["journals"]))
+check("every drop is reported", 3, len(gone))
+check("a drop is reported by path", True, "projects[0]._claimsNote" in gone)
+check("nothing is dropped from a clean profile", [],
+      ingest.strip_annotations({"basics": {"name": "A"}})[1])
+
+with tempfile.TemporaryDirectory() as tmp:
+    dirty_file = Path(tmp) / "cv.json"
+    dirty_file.write_text(json.dumps(DIRTY))
+    fragment, report = ingest.ingest_file(dirty_file)
+    check("ingest strips them from a JSON Resume", False, "_provenance" in fragment)
+    check("ingest says what it left behind", 3, len(report["dropped"]))
+    check("the user is told, not just the log", True,
+          any("private annotation" in t for t in report["todo"]))
+    rendered = json.dumps(fragment)
+    check("no private path survives into the profile", True,
+          "CLAIMS.md" not in rendered and ".claude/memory" not in rendered)
+
 
 # --------------------------------------------------------------------------- #
 group("network")

@@ -283,6 +283,10 @@ def scan_source(source_id: str, target: str | None = None, limit: int = 200,
 
     if source is None:
         return [], {**report, "status": "unknown-source"}
+    if sources.is_disabled(source):
+        return [], {**report, "status": "disabled",
+                    "detail": "muted in your sources.local.json; re-enable with "
+                              f"`opp sources-add --id {source_id} --enable`"}
     if source_id not in NORMALISERS:
         return [], {**report, "status": "not-scannable",
                     "detail": "no key-free feed; use `opp apply` for this one"}

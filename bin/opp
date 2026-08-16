@@ -46,6 +46,11 @@ def cmd_init(args) -> int:
     if not config.exists():
         config.write_text(json.dumps(paths.DEFAULT_CONFIG, indent=2) + "\n")
     print(f"rules:     {config}  {DIM}(your hard limits — nothing is assumed for you){OFF}")
+
+    local = paths.local_sources_path(workspace)
+    if not local.exists():
+        local.write_text(json.dumps(paths.DEFAULT_LOCAL_SOURCES, indent=2) + "\n")
+    print(f"sources:   {local}  {DIM}(your own boards, merged over the shipped registry){OFF}")
     profile = paths.profile_path(workspace)
     if not profile.exists():
         print(f"\nNo profile yet. The engine can find work without one, but it cannot")
@@ -481,10 +486,12 @@ def cmd_inbox(args) -> int:
 def cmd_sources(args) -> int:
     registry = sources.load()
     rows = sources.filter_sources(
-        sources.all_sources(registry),
+        sources.all_sources(registry, include_disabled=True),
         free_only=args.free_only, kind=args.kind, region=args.region,
         opportunity_type=args.type, no_key=args.no_key,
         automatable=True if args.automatable else None)
+    if args.local:
+        rows = [s for s in rows if s.get("_origin") in ("local", "patched")]
 
     if args.json:
         emit(rows, True)
@@ -512,8 +519,18 @@ def cmd_sources(args) -> int:
             mark = f"{RED}unverified{OFF}"
         age = f"{stale}d ago" if stale is not None else "never"
 
+        # Where the row came from, so a number you are about to trust can always
+        # be traced to whoever asserted it — the project, or you.
+        origin = source.get("_origin", "shipped")
+        badge = {"local": f"{YELLOW}+local{OFF}", "patched": f"{YELLOW}~patched{OFF}"}.get(origin, "")
+        if sources.is_disabled(source):
+            badge = f"{DIM}off{OFF}"
+
         scannable = "scan" if source["id"] in scan.SCANNABLE else "    "
-        print(f"  {source['id']:<18} {scannable}  {source['kind']:<22} {allowance:<28} {mark} ({age})")
+        name = f"{DIM}{source['id']}{OFF}" if sources.is_disabled(source) else source["id"]
+        pad = " " * max(0, 18 - len(source["id"]))
+        print(f"  {name}{pad} {scannable}  {source['kind']:<22} {allowance:<28} "
+              f"{mark} ({age}) {badge}")
         if args.long:
             print(f"      {DIM}{source['name']} — {', '.join(source.get('opportunity_types', []))}"
                   f" · {', '.join(source.get('regions', []))}{OFF}")
@@ -521,6 +538,260 @@ def cmd_sources(args) -> int:
                 print(f"      {DIM}{source['why_it_matters']}{OFF}")
     print(f"\n{DIM}'scan' = has a key-free feed this tool can read directly."
           f" The rest need a browser and a human-held login.{OFF}")
+    mine = [s for s in rows if s.get("_origin") in ("local", "patched")]
+    if mine:
+        print(f"{DIM}+local / ~patched come from {paths.local_sources_path()}{OFF}")
+    return 0
+
+
+def cmd_sources_add(args) -> int:
+    """Add, patch, mute or drop a row in the workspace's own source list.
+
+    A command rather than "edit the JSON" because this file is meant to be
+    written by an agent as often as by a person, and a half-written registry is
+    worse than no registry: every later scan reads it.
+    """
+    workspace = paths.find_workspace()
+    if not workspace.exists():
+        print("no workspace here — run: opp init", file=sys.stderr)
+        return 2
+
+    local_file = paths.local_sources_path(workspace)
+    try:
+        local = json.loads(local_file.read_text())
+    except (OSError, ValueError):
+        local = dict(paths.DEFAULT_LOCAL_SOURCES)
+    rows = local.setdefault("sources", [])
+
+    existing = next((r for r in rows if r.get("id") == args.id), None)
+    shipped = sources.get(args.id, sources.load(overlay=False))
+
+    if args.remove:
+        if existing is None:
+            print(f"nothing of yours to remove for '{args.id}'"
+                  + (" — it is a shipped source, so `--disable` is what mutes it"
+                     if shipped else ""), file=sys.stderr)
+            return 2
+        rows.remove(existing)
+        local_file.write_text(json.dumps(local, indent=2, ensure_ascii=False) + "\n")
+        restored = " — the shipped row is back in force" if shipped else ""
+        print(f"{GREEN}removed{OFF} your entry for {args.id}{restored}")
+        return 0
+
+    row: dict = dict(existing) if existing else {"id": args.id}
+    access: dict = dict(row.get("access") or {})
+
+    if args.endpoint:
+        access["endpoint"] = args.endpoint
+        access.setdefault("method", "api")
+        access.setdefault("auth", "none")
+        access.setdefault("key_required", False)
+    if args.per_company:
+        access["per_company"] = True
+    if args.max_rows is not None:
+        access["max_rows"] = args.max_rows
+    if access:
+        row["access"] = access
+
+    if args.name:
+        row["name"] = args.name
+    if args.kind:
+        row["kind"] = args.kind
+    if args.note:
+        row["_why"] = args.note
+    if args.disable:
+        row["disabled"] = True
+    if args.enable:
+        row.pop("disabled", None)
+        if not shipped and len(row) == 1:
+            print(f"'{args.id}' is not a source you have — nothing to enable", file=sys.stderr)
+            return 2
+
+    if not shipped and "access" not in row and not args.disable:
+        print(f"'{args.id}' is new, so it needs somewhere to look: pass --endpoint",
+              file=sys.stderr)
+        return 2
+
+    if existing:
+        rows[rows.index(existing)] = row
+    else:
+        rows.append(row)
+    local_file.write_text(json.dumps(local, indent=2, ensure_ascii=False) + "\n")
+
+    verb = "patched" if shipped else ("updated" if existing else "added")
+    print(f"{GREEN}{verb}{OFF} {args.id}  {DIM}→ {local_file}{OFF}")
+
+    merged = sources.get(args.id, sources.load())
+    if merged and (merged.get("verified") or {}).get("method") == "unverified":
+        print(f"{YELLOW}unverified{OFF} — nothing has called this endpoint yet. "
+              f"Prove it: opp sources-check --id {args.id}")
+    if merged and not sources.is_disabled(merged) and args.id not in scan.SCANNABLE:
+        print(f"{DIM}registered, but `opp scan` cannot read it: no normaliser for this "
+              f"payload shape. It counts as a known source and can be checked; turning it "
+              f"into a scannable feed needs one added to scan.py.{OFF}")
+    return 0
+
+
+#: Fields a caller may never assert. `state` and `score` are *earned* — by
+#: matching, and by a confirmation someone actually saw. A collector that could
+#: post `state: applied` could write an application history that never happened,
+#: which is the one thing this tool exists not to do.
+EARNED_FIELDS = ("id", "fingerprint", "state", "state_reason", "score", "score_detail")
+
+
+def cmd_add(args) -> int:
+    """Take opportunities found by something other than `opp scan`.
+
+    The scanners here read nine payload shapes. The web has thousands, most
+    behind a login, and writing a parser per vendor does not converge. An agent
+    with a browser already reads any of them — so the useful boundary is not
+    "what can this program parse" but "what may enter the store, and under what
+    checks". Rows arriving this way are held to exactly the checks a scanned row
+    is: the same plausibility validator, the same fingerprint dedup, the same
+    refusal to let a caller name its own state.
+    """
+    workspace = paths.find_workspace()
+    if not workspace.exists():
+        print("no workspace here — run: opp init", file=sys.stderr)
+        return 2
+
+    if args.url or args.title:
+        if not (args.url and args.title):
+            print("one posting needs at least --url and --title", file=sys.stderr)
+            return 2
+        incoming = [{"url": args.url, "title": args.title, "org": args.org or "",
+                     "description": args.description or "", "location": args.location or "",
+                     "posted_at": args.posted or "", "opportunity_type": args.type or "employment"}]
+    else:
+        raw = sys.stdin.read()
+        if not raw.strip():
+            print("nothing on stdin — pipe a JSON object or array, or pass --url/--title",
+                  file=sys.stderr)
+            return 2
+        try:
+            payload = json.loads(raw)
+        except ValueError as err:
+            print(f"that is not JSON: {err}", file=sys.stderr)
+            return 2
+        incoming = payload if isinstance(payload, list) else [payload]
+
+    con = store.connect(paths.db_path(workspace))
+    outcomes = {"new": 0, "duplicate": 0, "known": 0}
+    rejected: list[dict] = []
+    asserted: set[str] = set()
+
+    for item in incoming:
+        if not isinstance(item, dict):
+            rejected.append({"row": str(item)[:80], "why": "not an object"})
+            continue
+        row = {k: v for k, v in item.items() if k not in EARNED_FIELDS}
+        asserted |= {k for k in item if k in EARNED_FIELDS}
+        row.setdefault("source", args.source)
+        # Provenance, not decoration: a row a person or an agent handed over did
+        # not come from a verified feed, and six months later that difference is
+        # the difference between a lead you can trust and one you cannot.
+        row.setdefault("source_ref", "collected")
+        why = scan.plausible(row)
+        if why:
+            rejected.append({"row": (row.get("title") or row.get("url") or "?")[:70], "why": why})
+            continue
+        outcomes[store.upsert(con, row)] += 1
+    con.commit()
+
+    if args.json:
+        print(json.dumps({**outcomes, "rejected": rejected,
+                          "ignored_fields": sorted(asserted)}, indent=2))
+        return 0
+
+    if asserted:
+        print(f"{YELLOW}ignored{OFF} {', '.join(sorted(asserted))} — a row does not get to "
+              f"declare its own state or score{OFF}")
+    for bad_row in rejected:
+        print(f"  {RED}rejected{OFF} {bad_row['why']:<28} {DIM}{bad_row['row']}{OFF}")
+    print(f"\n{outcomes['new']} added, {outcomes['duplicate']} same job under another URL, "
+          f"{outcomes['known']} already here"
+          + (f", {len(rejected)} rejected" if rejected else ""))
+    if outcomes["new"]:
+        print(f"{DIM}next:  opp match --top 20{OFF}")
+    return 0
+
+
+def cmd_rules(args) -> int:
+    """Read and change the workspace's hard rules.
+
+    Editing config.json by hand still works and always will. This exists because
+    the rules are the one thing a user changes mid-conversation ("actually, not
+    the US"), and a typo in a knockout rule fails silently — it does not error,
+    it just stops knocking things out.
+    """
+    workspace = paths.find_workspace()
+    if not workspace.exists():
+        print("no workspace here — run: opp init", file=sys.stderr)
+        return 2
+
+    config_file = paths.config_path(workspace)
+    config = paths.load_config(workspace)
+
+    if not (args.set or args.add or args.remove):
+        print(f"{config_file}\n")
+        for key in paths.SETTABLE_RULES:
+            value = config.get(key)
+            shown = ", ".join(str(v) for v in value) if isinstance(value, list) else value
+            print(f"  {key:<20} {shown if shown not in ('', [], None) else DIM + '(none)' + OFF}")
+        print(f"\n  {DIM}{'auto_submit_requires':<20} read-only — "
+              f"{len(config.get('auto_submit_requires', []))} conditions no setting waives{OFF}")
+        print(f"\n{DIM}change one:  opp rules --set min_fit=0.55"
+              f"\n             opp rules --add exclude_countries='united states'"
+              f"\n             opp rules --remove exclude_countries='united states'{OFF}")
+        return 0
+
+    changed: list[str] = []
+    for raw in (args.set or []):
+        key, _, value = raw.partition("=")
+        key = key.strip()
+        try:
+            config[key] = paths.coerce_rule(key, value.strip())
+        except (KeyError, ValueError) as err:
+            # KeyError stringifies to its repr, quotes and all — the message is
+            # for a person to read, so take the message.
+            print(f"{RED}{err.args[0] if err.args else err}{OFF}", file=sys.stderr)
+            return 2
+        changed.append(f"{key} = {config[key]}")
+
+    for raw, removing in [(r, False) for r in (args.add or [])] + \
+                         [(r, True) for r in (args.remove or [])]:
+        key, _, value = raw.partition("=")
+        key, value = key.strip(), value.strip()
+        if key not in paths.LIST_RULES:
+            print(f"{RED}{key} is not a list — use --set{OFF}", file=sys.stderr)
+            return 2
+        try:
+            item = paths.coerce_rule_item(key, value)
+        except ValueError as err:
+            print(f"{RED}{err}{OFF}", file=sys.stderr)
+            return 2
+        current = list(config.get(key) or [])
+        if removing:
+            if item not in current:
+                print(f"{DIM}{key} does not contain '{item}' — nothing to remove{OFF}")
+                continue
+            current.remove(item)
+        elif item in current:
+            print(f"{DIM}{key} already has '{item}'{OFF}")
+            continue
+        else:
+            current.append(item)
+        config[key] = current
+        changed.append(f"{key} = {', '.join(current) or '(none)'}")
+
+    if not changed:
+        return 0
+    # The `_`-prefixed keys are the file's own documentation; writing the merged
+    # config back keeps them, so the file a person opens still explains itself.
+    config_file.write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n")
+    for line in changed:
+        print(f"{GREEN}set{OFF} {line}")
+    print(f"{DIM}→ {config_file}{OFF}")
     return 0
 
 
@@ -566,6 +837,7 @@ def cmd_scan(args) -> int:
         wanted = [(sid, None) for sid in free_feeds]
 
     totals = {"new": 0, "duplicate": 0, "known": 0}
+    per_source: list[dict] = []
     for source_id, target in wanted:
         rows, report = scan.scan_source(source_id, target, limit=args.limit, registry=registry)
         outcomes = {"new": 0, "duplicate": 0, "known": 0}
@@ -580,6 +852,9 @@ def cmd_scan(args) -> int:
                           detail=report.get("detail", ""))
         con.commit()
 
+        per_source.append({**report, **outcomes})
+        if args.json:
+            continue
         if report["status"] == "ok":
             line = (f"  {GREEN}ok{OFF}    {source_id:<16} {report['fetched']:>4} fetched  "
                     f"{outcomes['new']:>4} new  {outcomes['duplicate']:>3} dup  "
@@ -593,10 +868,13 @@ def cmd_scan(args) -> int:
         else:
             print(f"  {RED}{report['status']}{OFF}  {source_id:<16} {report.get('detail', '')[:80]}")
 
+    con.close()
+    if args.json:
+        print(json.dumps({**totals, "sources": per_source}, indent=2))
+        return 0
     print(f"\n{totals['new']} new opportunit(ies), {totals['duplicate']} same job under another URL")
     if totals["new"]:
         print("next:  opp list --state new")
-    con.close()
     return 0
 
 
@@ -643,13 +921,17 @@ def cmd_show(args) -> int:
 
 def cmd_doctor(args) -> int:
     problems: list[str] = []
+    state: dict = {}
     workspace = paths.find_workspace()
-    print(f"workspace: {workspace}{'' if workspace.exists() else '  (not created — run opp init)'}")
+    say = (lambda *a, **k: None) if getattr(args, "json", False) else print
+    state["workspace"], state["workspace_exists"] = str(workspace), workspace.exists()
+    say(f"workspace: {workspace}{'' if workspace.exists() else '  (not created — run opp init)'}")
     if not workspace.exists():
         problems.append("no workspace")
 
     profile = paths.profile_path(workspace)
-    print(f"profile:   {'present' if profile.exists() else 'missing — scan works, match and apply do not'}")
+    state["profile"] = profile.exists()
+    say(f"profile:   {'present' if profile.exists() else 'missing — scan works, match and apply do not'}")
     if not profile.exists():
         problems.append("no profile")
 
@@ -665,19 +947,28 @@ def cmd_doctor(args) -> int:
         return age is None or age > sources.STALE_DAYS
 
     stale = [s for s in allsrc if is_stale(s)]
-    print(f"sources:   {len(allsrc)} known · {len(free)} free · {len(scannable)} directly scannable")
+    state["sources"] = {"known": len(allsrc), "free": len(free),
+                        "scannable": len(scannable), "stale": len(stale),
+                        "scannable_ids": [s["id"] for s in scannable]}
+    say(f"sources:   {len(allsrc)} known · {len(free)} free · {len(scannable)} directly scannable")
     if stale:
-        print(f"           {YELLOW}{len(stale)} row(s) unverified for over {sources.STALE_DAYS} days"
+        say(f"           {YELLOW}{len(stale)} row(s) unverified for over {sources.STALE_DAYS} days"
               f"{OFF} — re-check with: opp sources check")
 
     if workspace.exists():
         con = store.connect(paths.db_path(workspace))
         counts = store.counts(con)
         total = sum(counts.values())
-        print(f"store:     {total} opportunit(ies) " +
+        state["store"] = {"total": total, "by_state": dict(sorted(counts.items()))}
+        say(f"store:     {total} opportunit(ies) " +
               (", ".join(f"{k}={v}" for k, v in sorted(counts.items())) if counts else ""))
         con.close()
 
+    state["problems"] = problems
+    state["ready"] = not problems
+    if getattr(args, "json", False):
+        print(json.dumps(state, indent=2))
+        return 1 if problems else 0
     if problems:
         print(f"\n{YELLOW}not ready:{OFF} " + ", ".join(problems))
         return 1
@@ -752,6 +1043,19 @@ def main() -> int:
     p.add_argument("--blocked", action="store_true", help="record a wall instead of a submission")
     p.set_defaults(func=cmd_applied)
 
+    p = sub.add_parser("add", help="take opportunities an agent or a person found, from JSON")
+    p.add_argument("--source", default="agent",
+                   help="where it came from, for provenance (default: %(default)s)")
+    p.add_argument("--url", help="one posting: the page to apply through")
+    p.add_argument("--title")
+    p.add_argument("--org")
+    p.add_argument("--location")
+    p.add_argument("--description")
+    p.add_argument("--posted", help="ISO date the posting went up")
+    p.add_argument("--type", help="employment, contract, freelance, grant, …")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_add)
+
     p = sub.add_parser("sources", help="where opportunities can be found, and what each costs")
     p.add_argument("--free-only", action="store_true", help="only what needs no card")
     p.add_argument("--no-key", action="store_true", help="only what needs no API key")
@@ -759,9 +1063,34 @@ def main() -> int:
     p.add_argument("--region")
     p.add_argument("--type", help="employment, freelance, contract, grant, …")
     p.add_argument("--automatable", action="store_true")
+    p.add_argument("--local", action="store_true", help="only rows you added or patched")
     p.add_argument("--long", "-l", action="store_true")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_sources)
+
+    p = sub.add_parser("sources-add",
+                       help="add a source, patch a shipped one, or mute one — in your workspace")
+    p.add_argument("--id", required=True, help="the source id: new one, or one that ships")
+    p.add_argument("--name", help="human name")
+    p.add_argument("--endpoint", help="URL; {n} = the scan limit, {board} = the --target company")
+    p.add_argument("--kind", help="aggregator, ats-board, job-board, freelance-marketplace, …")
+    p.add_argument("--per-company", action="store_true",
+                   help="endpoint is one company's board; needs --target when scanning")
+    p.add_argument("--max-rows", type=int, help="clamp --limit for a feed that degrades above it")
+    p.add_argument("--note", help="why this one is worth having")
+    p.add_argument("--disable", action="store_true", help="mute it without deleting it")
+    p.add_argument("--enable", action="store_true", help="un-mute it")
+    p.add_argument("--remove", action="store_true", help="drop YOUR entry (shipped rows return)")
+    p.set_defaults(func=cmd_sources_add)
+
+    p = sub.add_parser("rules", help="your hard limits — show them, or change one")
+    p.add_argument("--set", action="append", metavar="KEY=VALUE",
+                   help="e.g. min_fit=0.55, auto_submit=false")
+    p.add_argument("--add", action="append", metavar="KEY=VALUE",
+                   help="append to a list rule, e.g. exclude_countries='united states'")
+    p.add_argument("--remove", action="append", metavar="KEY=VALUE",
+                   help="drop one member of a list rule")
+    p.set_defaults(func=cmd_rules)
 
     p = sub.add_parser("sources-check", help="re-verify sources by actually calling them")
     p.add_argument("--id")
@@ -773,6 +1102,7 @@ def main() -> int:
     p.add_argument("--source", help="one source id (default: every key-free feed)")
     p.add_argument("--target", help="company slug, for a per-company board")
     p.add_argument("--limit", type=int, default=200)
+    p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_scan)
 
     p = sub.add_parser("list", help="what is in the workspace")
@@ -790,6 +1120,7 @@ def main() -> int:
     p.set_defaults(func=cmd_show)
 
     p = sub.add_parser("doctor", help="is this set up to actually work")
+    p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_doctor)
 
     args = parser.parse_args()
