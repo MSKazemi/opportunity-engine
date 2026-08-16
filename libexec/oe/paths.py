@@ -76,7 +76,31 @@ DEFAULT_CONFIG = {
     "no_clearance": True,
     "_no_clearance": "Knock out roles requiring a security clearance you cannot obtain.",
     "min_fit": 0.45,
-    "_min_fit": "Below this, `opp match --top` will not suggest applying."
+    "_min_fit": "Below this, `opp match --top` will not suggest applying.",
+
+    # --- how an application leaves your machine -----------------------------
+    # Volume is a real constraint: at ten or fifty packages, reviewing each one
+    # by hand is the bottleneck, and some people would rather trade that review
+    # for throughput. That is a judgement about *your* time and *your* name, so
+    # it is yours to make. What it cannot buy is a false statement — see
+    # auto_submit_requires below, which no setting turns off.
+    "auto_submit": False,
+    "_auto_submit": "false = a worker fills the form, screenshots it and stops for you. "
+                    "true = it presses submit itself, but only when every condition in "
+                    "auto_submit_requires holds. Anything else still stops and waits.",
+    "auto_submit_max": 10,
+    "_auto_submit_max": "Most applications a single run may send. A ceiling on the blast "
+                        "radius of a mistake — the rest are prepared and left waiting.",
+    "auto_submit_requires": [
+        "every form field answered truthfully from your profile — no MISSING, no guess",
+        "no private notes detected in the generated CV",
+        "the posting was not knocked out by your own rules",
+        "no login, captcha, 2FA or identity check in the way",
+        "the confirmation the site returned is actually visible",
+    ],
+    "_auto_submit_requires": "Read-only. These are not preferences and setting auto_submit "
+                             "does not waive them: each one is the difference between sending "
+                             "fast and sending something untrue over your signature.",
 }
 
 

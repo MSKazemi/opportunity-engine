@@ -20,8 +20,9 @@ want to search Greenhouse, Lever, Ashby, Arbeitnow, Remotive, RemoteOK, Jobicy, 
 We Work Remotely from one command without paying for a job-board SaaS or handing your CV to a third
 party. It differs from LoopCV, Jobscan, Teal and Huntr in being free and self-hosted: your profile
 is a JSON Resume file on your own disk and every data source records how and when it was verified.
-It is **not** for you if you want a hosted dashboard, one-click auto-apply to hundreds of jobs, or a
-service that submits applications without your review.
+It is **not** for you if you want a hosted dashboard or one-click auto-apply to hundreds of jobs.
+Sending can be automated (`auto_submit`), but it is off by default, capped per run, and never
+waives the checks that keep an application truthful.
 
 ```bash
 opp init                       # a workspace, here
@@ -162,7 +163,7 @@ gitignored here, but a gitignore is a safety net, not a design. If no workspace 
 ### Verify
 
 ```bash
-bin/selftest        # 156 checks, no network, no key, no account
+bin/selftest        # 172 checks, no network, no key, no account
 opp doctor          # whether this setup can actually work
 ```
 
@@ -183,7 +184,7 @@ This is **v0.4**. What is real is marked real; nothing here is aspirational.
 | `opp profile` — what you can claim, and what is missing | **working** |
 | `opp match` — two-stage scoring, per-requirement evidence, knockouts | **working** |
 | `opp cv` — parser-safe LaTeX → PDF, tailored by reordering only | **working** |
-| `opp apply` — assembles the package; never submits | **working** |
+| `opp apply` — assembles the package; submits only if you opt in | **working** |
 | `opp apply --fleet` — queues the packages for parallel filling | **working** |
 
 ---
@@ -257,16 +258,48 @@ workers never take the same posting.
 > **Use `--terminals`, not `--headless`, for form filling.** A headless worker has no Chrome
 > and will block every browser task. `fleet doctor` tells you which mode your machine supports.
 
-### A worker fills the form and stops
+### Review first, or send automatically — your call
 
-It never clicks submit. Every task ends in fleet's `blocked` lane with a screenshot of the
-completed form and the reason `ready to submit: <org> — <title>`, and you clear them in
-batches. That is the design, not a limitation: sending an application is a human act with your
-name on it, and the same rule that stops the tool inventing a salary figure stops it pressing
-send. Anything behind a login, CAPTCHA or 2FA parks the same way, with the wall named.
+At ten or fifty packages, reviewing each one by hand is the bottleneck. Whether to trade that
+review for throughput is a judgement about your time and your name, so it is a setting, not a
+rule. In `.opp/config.json`:
 
-The rules travel **inside** each task (`<package>/fleet-task.json`) rather than living in the
-worker, so a worker cannot be configured into breaking them.
+```json
+{
+  "auto_submit": false,
+  "auto_submit_max": 10
+}
+```
+
+| | `auto_submit: false` *(default)* | `auto_submit: true` |
+|---|---|---|
+| Worker fills the form | yes | yes |
+| Screenshot before anything irreversible | yes | yes |
+| Presses submit | **no** — blocks with `ready to submit: <org> — <title>` | yes, on packages that qualify |
+| Per-run ceiling | — | `auto_submit_max`, rest are prepared and left waiting |
+
+Override per run with `opp apply --top 10 --fleet --auto-submit` or `--no-auto-submit`.
+
+### What `auto_submit` does not buy
+
+It buys speed. It does not buy a false statement. These hold in **both** modes and no setting
+waives them — a package failing any of them is prepared, then left waiting:
+
+- **A field that cannot be answered truthfully from your profile.** MISSING is escalated to
+  you, never guessed. Most forms ask those questions under a declaration.
+- **Private notes detected in the generated CV.**
+- **A posting your own rules knocked out.**
+- **A login, CAPTCHA, 2FA or identity check.** These are not automated in either mode — so
+  turning `auto_submit` on does *not* clear the first two walls in the diagram, only the last
+  one. Applications behind a login still need you.
+- **No visible confirmation after submitting.** A worker that cannot see one does not know
+  whether it sent, so it blocks with what it did see. A clicked button is never recorded as a
+  submitted application.
+
+`opp apply --auto-submit` says up front how many will be sent, names each one, and gives the
+reason for every package it is holding back. The rules travel **inside** each task
+(`<package>/fleet-task.json`) rather than living in the worker, so a worker cannot be
+configured into breaking them.
 
 ---
 
@@ -299,8 +332,11 @@ publish open aggregate feeds. All were verified with a real request on 2026-08-1
 configured here.
 
 **Does it auto-apply to hundreds of jobs?**
-No, and it will not. Volume without fit burns the free daily allowances that make the tool possible,
-and an application submitted without your review carries your name, not the tool's.
+No. It can submit automatically — `auto_submit` in your config, off by default — but only to
+postings that passed your own match rules, only up to `auto_submit_max` per run, and only when
+every field was answerable truthfully from your profile. Volume without fit burns the free daily
+allowances that make the tool possible, and the application carries your name, not the tool's.
+Anything behind a login or a CAPTCHA still waits for you regardless of the setting.
 
 **Will it write my CV for me?**
 It will generate a tailored, parseable CV from facts already in your profile. It will not invent

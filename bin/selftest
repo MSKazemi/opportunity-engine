@@ -473,6 +473,46 @@ check("the handoff never contains a credential", [],
        if k in ("password", "token", "secret", "api_key")])
 check("the handoff tells the worker what to block with", True,
       any("ready to submit" in r for r in task["rules"]))
+check("filling and stopping is the default", False, task["auto_submit"])
+
+# auto_submit is a preference about the user's own time. It buys speed; it must
+# never buy a false statement, so the blockers below are not waivable by it.
+clean = apply_mod.fleet_task(POSTING, Path("/tmp/x"), auto_submit=True, blockers=[])
+check("a clean package may be sent when asked", True, clean["auto_submit"])
+check("sending still demands the real confirmation", True,
+      any("confirmation the site actually returned" in r for r in clean["rules"]))
+check("the audit screenshot is taken before, not after", True,
+      any("BEFORE" in r for r in clean["rules"]))
+check("a clicked button is never mistaken for success", True,
+      any("Never infer success" in r for r in clean["rules"]))
+check("even sending never types a password", True,
+      any("Never type a password" in r for r in clean["rules"]))
+
+dirty = apply_mod.fleet_task(POSTING, Path("/tmp/x"), auto_submit=True,
+                             blockers=["2 field(s) only you can answer: Phone"])
+check("auto_submit does not override a blocker", False, dirty["auto_submit"])
+check("the blocked package is told not to submit", True,
+      any("DO NOT SUBMIT" in r for r in dirty["rules"]))
+check("and the worker is told why it may not", True,
+      any("did not qualify" in r for r in dirty["rules"]))
+
+# The blockers themselves, computed from what the tool already knows.
+ok_report = {"knockouts": []}
+check("a clean package has nothing blocking it", [],
+      apply_mod.submit_blockers(ok_report, [], []))
+check("an unanswered field blocks sending", 1,
+      len(apply_mod.submit_blockers(ok_report, ["Phone"], [])))
+check("private notes in the CV block sending", 1,
+      len(apply_mod.submit_blockers(ok_report, [], ["note: call recruiter"])))
+check("a knocked-out posting blocks sending", 1,
+      len(apply_mod.submit_blockers({"knockouts": [{"why": "needs clearance"}]}, [], [])))
+check("every reason is reported, not just the first", 3,
+      len(apply_mod.submit_blockers({"knockouts": [{"why": "x"}]}, ["Phone"], ["note"])))
+
+check("the note tells the worker sending is on", True,
+      "auto_submit is ON" in apply_mod.queue_note(POSTING, Path("/tmp/p"), [], will_submit=True))
+check("and by default tells it the opposite", True,
+      "never submit" in apply_mod.queue_note(POSTING, Path("/tmp/p"), [], will_submit=False))
 
 # The queue lane. A worker reads `notes` and nothing else about the job, so the
 # note has to be self-sufficient — and a pipe in it would corrupt add-batch.

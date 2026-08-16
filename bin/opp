@@ -297,7 +297,18 @@ def cmd_apply(args) -> int:
         print("nothing to prepare — run: opp match", file=sys.stderr)
         return 2
 
+    # Config is the standing policy; the flag overrides it for this run only.
+    auto_submit = (constraints.get("auto_submit", False)
+                   if args.auto_submit is None else args.auto_submit)
+    send_budget = int(constraints.get("auto_submit_max", 10)) if auto_submit else 0
+    if auto_submit:
+        print(f"{RED}auto-submit is ON{OFF} — up to {send_budget} application(s) may be sent "
+              f"without you seeing them first.")
+        print(f"{DIM}Packages that cannot be sent truthfully are prepared and left waiting "
+              f"anyway.{OFF}\n")
+
     prepared = 0
+    will_send = 0
     queue_entries = []
     for row in rows:
         posting = dict(row)
@@ -311,9 +322,14 @@ def cmd_apply(args) -> int:
                   f"below your min_fit of {constraints['min_fit']}")
             continue
 
+        # The cap is spent per package actually cleared to send, not per package
+        # prepared — otherwise a run of blocked ones would exhaust it silently.
         result = apply_mod.build_package(loaded, posting, report, workspace,
-                                         with_pdf=not args.no_pdf)
+                                         with_pdf=not args.no_pdf,
+                                         auto_submit=auto_submit and will_send < send_budget)
         prepared += 1
+        if result["will_submit"]:
+            will_send += 1
         queue_entries.append(result["queue_entry"])
         print(f"\n{GREEN}prepared{OFF} {posting['title']}")
         print(f"  {result['package']}")
@@ -332,13 +348,28 @@ def cmd_apply(args) -> int:
             print(f"  {YELLOW}{len(result['unanswered'])} form field(s) only you can answer{OFF}: "
                   f"{', '.join(result['unanswered'][:5])}")
 
+        if result["will_submit"]:
+            print(f"  {RED}→ this one will be SENT without you seeing it{OFF}")
+        elif auto_submit:
+            reason = (result["submit_blockers"][0] if result["submit_blockers"]
+                      else f"the run's cap of {send_budget} is spent")
+            print(f"  {DIM}→ waits for you: {reason}{OFF}")
+
         con.execute("UPDATE opportunities SET state = 'drafted', updated_at = ? WHERE id = ?",
                     (store.now(), posting["id"]))
         store.log(con, posting["id"], "drafted", result["package"])
     con.commit()
     con.close()
 
-    if prepared:
+    if prepared and will_send:
+        # `opp` itself still sends nothing — but saying "nothing has been sent"
+        # while handing workers permission to send would be true of this process
+        # and false about what is now in motion.
+        print(f"\n{prepared} package(s) prepared. {RED}{will_send} of them will be SENT{OFF} "
+              f"by a worker, without a further look from you.")
+        print(f"{DIM}Not started yet — they go out when the fleet runs. To stop it: "
+              f"delete the queued tasks, or re-run with --no-auto-submit.{OFF}")
+    elif prepared:
         print(f"\n{prepared} package(s) prepared. {RED}Nothing has been sent.{OFF}")
 
     if prepared and args.fleet:
@@ -644,7 +675,12 @@ def main() -> int:
     p.add_argument("--no-pdf", action="store_true")
     p.add_argument("--fleet", action="store_true",
                    help="also queue each package for agent-fleet, so many get filled "
-                        "in parallel (workers fill and stop; they never submit)")
+                        "in parallel")
+    p.add_argument("--auto-submit", dest="auto_submit", action="store_true", default=None,
+                   help="let workers press submit on packages that qualify "
+                        "(overrides auto_submit in your config)")
+    p.add_argument("--no-auto-submit", dest="auto_submit", action="store_false",
+                   help="fill and stop, whatever the config says")
     p.set_defaults(func=cmd_apply)
 
     p = sub.add_parser("applied", help="record a submission you actually made")

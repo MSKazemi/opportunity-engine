@@ -400,6 +400,34 @@ cd ~/your-private-dir &amp;&amp; opp init &amp;&amp; opp ingest ~/cv.pdf</code><
 </table>
 </div>
 
+<h3>Two modes — and the one that does not change</h3>
+<p>The diagram above shows the default: a worker fills the form and stops at all three walls. At
+  ten or fifty packages that review becomes the bottleneck, so sending can be automated instead —
+  in <code>.opp/config.json</code>:</p>
+<pre><code>{ "auto_submit": true, "auto_submit_max": 10 }</code></pre>
+<p>Look at what that actually changes in the picture. <strong>Only the third lane.</strong> Lanes
+  one and two are a sign-in page and a “verify you are human” check — those are not automated in
+  either mode, because passing them for you is exactly the thing this tool will not do. Turning
+  <code>auto_submit</code> on speeds up the applications that had no wall in front of them; the
+  ones behind a login still wait for you.</p>
+<div class="scroll">
+<table>
+  <thead><tr><th></th><th><code>auto_submit: false</code> (default)</th><th><code>auto_submit: true</code></th></tr></thead>
+  <tbody>
+    <tr><td>Fills the form</td><td>yes</td><td>yes</td></tr>
+    <tr><td>Screenshot before anything irreversible</td><td>yes</td><td>yes</td></tr>
+    <tr><td>Presses submit</td><td><strong>no</strong> — blocks for you</td><td>yes, if the package qualifies</td></tr>
+    <tr><td>Login / CAPTCHA / 2FA</td><td colspan="2" style="text-align:center">always you — no setting changes this</td></tr>
+    <tr><td>A question not in your profile</td><td colspan="2" style="text-align:center">always you — a guess would be a false statement</td></tr>
+    <tr><td>Per-run ceiling</td><td>—</td><td><code>auto_submit_max</code></td></tr>
+  </tbody>
+</table>
+</div>
+<p class="note"><code>auto_submit</code> buys speed. It does not buy a false statement: a package
+  with an unanswerable field, private notes detected in its CV, or a knockout from your own rules
+  is prepared and left waiting whatever the setting says — and a submit with no visible
+  confirmation is still reported as blocked, never as sent.</p>
+
 <p><code>fleet blocked</code> is the <em>index</em> of what is waiting, grouped by reason — not a
   place the work happens. The work happens in each tab:</p>
 <pre><code>fleet blocked          # what is waiting, and why, grouped by reason

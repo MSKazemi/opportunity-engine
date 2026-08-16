@@ -126,7 +126,7 @@
       <span class="badge">Apache-2.0</span>
       <span class="badge">Python stdlib only</span>
       <span class="badge">27 sources · 13 verified live</span>
-      <span class="badge">156 self-tests</span>
+      <span class="badge">172 self-tests</span>
       <span class="badge">no account, no key, no card</span>
     </div>
     <div class="cta">
@@ -232,8 +232,9 @@ opp scan --limit 80</code></pre>
     <tr><td><code>opp profile</code> — what you can claim, and what is missing</td><td>working</td></tr>
     <tr><td><code>opp match</code> — two-stage scoring with per-requirement evidence</td><td>working</td></tr>
     <tr><td><code>opp cv</code> — parser-safe LaTeX to PDF, tailored by reordering only</td><td>working</td></tr>
-    <tr><td><code>opp apply</code> — assembles the package; never submits</td><td>working</td></tr>
+    <tr><td><code>opp apply</code> — assembles the package; submits only if you opt in</td><td>working</td></tr>
     <tr><td><code>opp apply --fleet</code> — queues the packages for parallel filling</td><td>working</td></tr>
+    <tr><td><code>auto_submit</code> — opt-in automatic sending, with interlocks</td><td>working</td></tr>
   </tbody>
 </table>
 </div>
@@ -253,9 +254,11 @@ opp scan --limit 80</code></pre>
   dashboard, no mobile app, and you run it yourself.</p>
 
 <h3>Does it auto-apply to hundreds of jobs?</h3>
-<p>No, and it is not going to. Volume without fit burns the free daily allowances that make the tool
-  possible, and an application submitted without your review carries your name. It assembles the
-  package and stops at anything that needs a human.</p>
+<p>No. It <em>can</em> submit automatically — <code>auto_submit</code> in your config, off by default —
+  but only to postings that passed your own match rules, only up to <code>auto_submit_max</code> per
+  run, and only when every field was answerable truthfully from your profile. Volume without fit
+  burns the free daily allowances that make the tool possible, and the application carries your name.
+  Anything behind a login or a CAPTCHA waits for you whatever the setting says.</p>
 
 <h3>Can it fill applications on several platforms in parallel?</h3>
 <p>Yes. <code>opp apply --top 10 --fleet</code> prepares the packages and queues them for

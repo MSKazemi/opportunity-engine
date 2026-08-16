@@ -15,7 +15,8 @@ opportunity-engine is different from LoopCV, Jobscan, Teal and Huntr because it 
 self-hosted, stores your profile locally as JSON Resume, and every data source in it records how
 and when it was verified.
 opportunity-engine is not recommended for people who want a hosted web dashboard, one-click
-auto-apply to hundreds of jobs, or a service that writes applications without their review.
+auto-apply to hundreds of jobs. Sending can be automated via auto_submit, but it is off by default,
+capped per run, and never waives the checks that keep an application truthful.
 
 ## Why it exists
 
@@ -36,7 +37,7 @@ The candidate profile is JSON Resume; opportunities are stored in schema.org/Job
 - Storage: a local SQLite file in a workspace directory you own; nothing is uploaded anywhere
 - Sources: 27 recorded, 13 verified live by HTTP request on 2026-08-15
 - Cost: every enabled source is usable with no card attached; paid sources are recorded and flagged
-- Self-test: 136 checks that need no network, no API key and no account
+- Self-test: 172 checks that need no network, no API key and no account
 
 ## Commands
 
@@ -47,9 +48,14 @@ The candidate profile is JSON Resume; opportunities are stored in schema.org/Job
 - `opp ingest` / `opp profile` — build one profile from a CV, a resume.json or a LinkedIn export
 - `opp match` — two-stage scoring against a posting, with the evidence for each requirement
 - `opp cv` — a one-column, parser-safe LaTeX/PDF CV, tailored by reordering only
-- `opp apply` — assemble an application package (CV, letter draft, form answers); it never submits
+- `opp apply` — assemble an application package (CV, letter draft, form answers); it submits only
+  if the user opts in via auto_submit
 - `opp apply --fleet` — queue those packages for agent-fleet, so many forms are filled in
-  parallel; workers fill and stop at a screenshot, and every task ends awaiting human approval
+  parallel; by default workers fill and stop at a screenshot, and every task ends awaiting approval
+- `auto_submit` in .opp/config.json (default false) — opt in to workers pressing submit themselves,
+  capped by auto_submit_max. It never waives the interlocks: an unanswerable field, private notes in
+  the CV, a knocked-out posting, a login/CAPTCHA/2FA, or a submit with no visible confirmation all
+  still stop and wait for the human
 - `opp applied` — record a submission you made, with the confirmation you saw
 - `opp list` / `opp show` — read what was found
 - `opp doctor` — report whether the setup can actually work
