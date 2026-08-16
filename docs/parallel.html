@@ -86,7 +86,7 @@
   footer { border-top: 1px solid var(--line); margin-top: 4rem; padding: 2rem 0 3rem; color: var(--dim); font-size: .9rem; }
   .note { color: var(--dim); font-size: .9rem; }
   .figure { border: 1px solid var(--line); border-radius: 12px; background: var(--card); padding: .5rem; }
-  .figure svg { display: block; width: 100%; min-width: 56rem; height: auto; }
+  .figure > .scroll > svg { display: block; width: 100%; min-width: 66rem; height: auto; }
   figcaption { color: var(--dim); font-size: .875rem; padding: .5rem .75rem 0; }
   .stopbox {
     border: 1px solid var(--stop); border-left-width: 4px; border-radius: 8px;
@@ -114,15 +114,18 @@
     offset-rotate: 0deg;
     animation: travel 4.4s linear infinite, fade 4.4s linear infinite;
   }
-  .p1 { offset-path: path("M 220 158 L 276 158 L 276 96 L 352 96"); }
-  .p2 { offset-path: path("M 220 158 L 352 158"); }
-  .p3 { offset-path: path("M 220 158 L 276 158 L 276 220 L 352 220"); }
-  .q1 { offset-path: path("M 492 96 L 540 96"); }
-  .q2 { offset-path: path("M 492 158 L 540 158"); }
-  .q3 { offset-path: path("M 492 220 L 540 220"); }
-  .r1 { offset-path: path("M 676 96 L 712 96 L 712 158 L 748 158"); }
-  .r2 { offset-path: path("M 676 158 L 748 158"); }
-  .r3 { offset-path: path("M 676 220 L 712 220 L 712 158 L 748 158"); }
+  .p1 { offset-path: path("M 205 158 L 234 158 L 234 92 L 262 92"); }
+  .p2 { offset-path: path("M 205 158 L 262 158"); }
+  .p3 { offset-path: path("M 205 158 L 234 158 L 234 224 L 262 224"); }
+  .q1 { offset-path: path("M 390 92 L 440 92"); }
+  .q2 { offset-path: path("M 390 158 L 440 158"); }
+  .q3 { offset-path: path("M 390 224 L 440 224"); }
+  .w1 { offset-path: path("M 560 92 L 600 92"); }
+  .w2 { offset-path: path("M 560 158 L 600 158"); }
+  .w3 { offset-path: path("M 560 224 L 600 224"); }
+  .r1 { offset-path: path("M 830 92 L 855 92 L 855 158 L 880 158"); }
+  .r2 { offset-path: path("M 830 158 L 880 158"); }
+  .r3 { offset-path: path("M 830 224 L 855 224 L 855 158 L 880 158"); }
   .d0 { animation-delay: 0s; }
   .d1 { animation-delay: .5s; }
   .d2 { animation-delay: 1s; }
@@ -134,9 +137,16 @@
   @keyframes fill { 0%,10% { width: 0; } 55%,100% { width: 46px; } }
   .field { fill: var(--flow); opacity: .55; animation: fill 4.4s ease-in-out infinite; }
 
-  /* the blocked lane pulsing for attention */
+  /* the blocked lanes pulsing for attention */
   @keyframes glow { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
   .pulse { animation: glow 2.2s ease-in-out infinite; }
+  .pulse.d1 { animation-delay: .35s; }
+  .pulse.d2 { animation-delay: .7s; }
+
+  /* wherever a person has to act */
+  .human { fill: var(--stop); }
+  .human-hint { font: 600 10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                fill: var(--stop); letter-spacing: .04em; }
 
   @media (prefers-reduced-motion: reduce) {
     .flow, .field, .pulse { animation: none; }
@@ -175,93 +185,138 @@
 
 <figure class="figure">
   <div class="scroll">
-  <svg viewBox="0 0 1020 268" role="img" aria-labelledby="figtitle figdesc">
+  <svg viewBox="0 0 1200 282" role="img" aria-labelledby="figtitle figdesc">
     <title id="figtitle">opportunity-engine to agent-fleet parallel pipeline</title>
-    <desc id="figdesc">Prepared application packages enter a shared queue, three parallel workers
-      each claim tasks and fill forms in their own Chrome tab, and every result lands in a blocked
-      lane awaiting human review before submission.</desc>
+    <desc id="figdesc">Prepared application packages enter a shared queue. Three parallel workers
+      each claim a task and fill a form in their own Chrome tab. Each worker then stops at its own
+      wall — a login, a CAPTCHA, a question only a person can answer, or the submit button — and
+      leaves that tab open. A person clears each tab separately; fleet blocked is only the index of
+      what is waiting.</desc>
+
+    <defs>
+      <symbol id="human" viewBox="0 0 24 24">
+        <circle cx="12" cy="7.5" r="4.2"/>
+        <path d="M2.6 21.4c0-5.2 4.2-8.2 9.4-8.2s9.4 3 9.4 8.2z"/>
+      </symbol>
+    </defs>
 
     <!-- column headings -->
     <text class="lbl-hd" x="40"  y="30">prepare</text>
-    <text class="lbl-hd" x="352" y="30">queue</text>
-    <text class="lbl-hd" x="540" y="30">workers · parallel</text>
-    <text class="lbl-hd" x="748" y="30">human gate</text>
+    <text class="lbl-hd" x="262" y="30">queue</text>
+    <text class="lbl-hd" x="440" y="30">workers · parallel</text>
+    <text class="lbl-hd" x="600" y="30">each tab stops at its own wall</text>
+    <text class="lbl-hd" x="880" y="30">you</text>
 
     <!-- stage 1: opp -->
-    <rect class="box" x="40" y="112" width="180" height="92" rx="9"/>
-    <text class="lbl"    x="56" y="138">opp scan</text>
-    <text class="lbl"    x="56" y="160">opp match</text>
-    <text class="lbl"    x="56" y="182">opp apply --fleet</text>
-    <text class="lbl-sm" x="56" y="198">→ packages on disk</text>
+    <rect class="box" x="40" y="104" width="165" height="108" rx="9"/>
+    <text class="lbl"    x="56" y="130">opp scan</text>
+    <text class="lbl"    x="56" y="152">opp match</text>
+    <text class="lbl"    x="56" y="174">opp apply --fleet</text>
+    <use href="#human" class="human" x="56" y="184" width="13" height="13"/>
+    <text class="lbl-sm" x="74" y="195">you answer MISSING</text>
 
     <!-- wires prepare → queue -->
-    <path class="wire" d="M 220 158 L 276 158 L 276 96 L 352 96"/>
-    <path class="wire" d="M 220 158 L 352 158"/>
-    <path class="wire" d="M 220 158 L 276 158 L 276 220 L 352 220"/>
+    <path class="wire" d="M 205 158 L 234 158 L 234 92 L 262 92"/>
+    <path class="wire" d="M 205 158 L 262 158"/>
+    <path class="wire" d="M 205 158 L 234 158 L 234 224 L 262 224"/>
 
     <!-- stage 2: queue -->
-    <rect class="box-accent" x="352" y="64" width="140" height="176" rx="9"/>
-    <text class="lbl-sm" x="352" y="56">.agents/queue/inbox</text>
-    <rect class="box" x="366" y="82" width="112" height="28" rx="5"/>
-    <text class="lbl-sm" x="376" y="100">p3 greenhouse</text>
-    <rect class="box" x="366" y="144" width="112" height="28" rx="5"/>
-    <text class="lbl-sm" x="376" y="162">p3 lever</text>
-    <rect class="box" x="366" y="206" width="112" height="28" rx="5"/>
-    <text class="lbl-sm" x="376" y="224">p5 ashby</text>
+    <rect class="box-accent" x="262" y="60" width="128" height="190" rx="9"/>
+    <text class="lbl-sm" x="262" y="52">.agents/queue/inbox</text>
+    <rect class="box" x="274" y="78" width="104" height="28" rx="5"/>
+    <text class="lbl-sm" x="284" y="96">p3 greenhouse</text>
+    <rect class="box" x="274" y="144" width="104" height="28" rx="5"/>
+    <text class="lbl-sm" x="284" y="162">p3 lever</text>
+    <rect class="box" x="274" y="210" width="104" height="28" rx="5"/>
+    <text class="lbl-sm" x="284" y="228">p5 ashby</text>
 
     <!-- wires queue → workers -->
-    <path class="wire" d="M 492 96 L 540 96"/>
-    <path class="wire" d="M 492 158 L 540 158"/>
-    <path class="wire" d="M 492 220 L 540 220"/>
+    <path class="wire" d="M 390 92 L 440 92"/>
+    <path class="wire" d="M 390 158 L 440 158"/>
+    <path class="wire" d="M 390 224 L 440 224"/>
 
-    <!-- stage 3: three workers -->
+    <!-- stage 3: three workers, each its own tab -->
     <g>
-      <rect class="box-accent" x="540" y="70" width="136" height="52" rx="8"/>
-      <text class="lbl-sm" x="550" y="90">terminal 1</text>
-      <text class="lbl-sm" x="550" y="106">own Chrome tab</text>
-      <rect x="550" y="112" width="46" height="4" rx="2" fill="var(--line)"/>
-      <rect class="field d0" x="550" y="112" height="4" rx="2"/>
+      <rect class="box-accent" x="440" y="66" width="120" height="52" rx="8"/>
+      <text class="lbl-sm" x="450" y="86">terminal 1</text>
+      <text class="lbl-sm" x="450" y="102">own Chrome tab</text>
+      <rect x="450" y="108" width="46" height="4" rx="2" fill="var(--line)"/>
+      <rect class="field d0" x="450" y="108" height="4" rx="2"/>
     </g>
     <g>
-      <rect class="box-accent" x="540" y="132" width="136" height="52" rx="8"/>
-      <text class="lbl-sm" x="550" y="152">terminal 2</text>
-      <text class="lbl-sm" x="550" y="168">own Chrome tab</text>
-      <rect x="550" y="174" width="46" height="4" rx="2" fill="var(--line)"/>
-      <rect class="field d2" x="550" y="174" height="4" rx="2"/>
+      <rect class="box-accent" x="440" y="132" width="120" height="52" rx="8"/>
+      <text class="lbl-sm" x="450" y="152">terminal 2</text>
+      <text class="lbl-sm" x="450" y="168">own Chrome tab</text>
+      <rect x="450" y="174" width="46" height="4" rx="2" fill="var(--line)"/>
+      <rect class="field d2" x="450" y="174" height="4" rx="2"/>
     </g>
     <g>
-      <rect class="box-accent" x="540" y="194" width="136" height="52" rx="8"/>
-      <text class="lbl-sm" x="550" y="214">terminal 3</text>
-      <text class="lbl-sm" x="550" y="230">own Chrome tab</text>
-      <rect x="550" y="236" width="46" height="4" rx="2" fill="var(--line)"/>
-      <rect class="field d4" x="550" y="236" height="4" rx="2"/>
+      <rect class="box-accent" x="440" y="198" width="120" height="52" rx="8"/>
+      <text class="lbl-sm" x="450" y="218">terminal 3</text>
+      <text class="lbl-sm" x="450" y="234">own Chrome tab</text>
+      <rect x="450" y="240" width="46" height="4" rx="2" fill="var(--line)"/>
+      <rect class="field d4" x="450" y="240" height="4" rx="2"/>
     </g>
 
-    <!-- wires workers → gate -->
-    <path class="wire-live" d="M 676 96 L 712 96 L 712 158 L 748 158"/>
-    <path class="wire-live" d="M 676 158 L 748 158"/>
-    <path class="wire-live" d="M 676 220 L 712 220 L 712 158 L 748 158"/>
+    <!-- wires workers → their own wall -->
+    <path class="wire-live" d="M 560 92 L 600 92"/>
+    <path class="wire-live" d="M 560 158 L 600 158"/>
+    <path class="wire-live" d="M 560 224 L 600 224"/>
 
-    <!-- stage 4: human gate -->
-    <rect class="box-stop pulse" x="748" y="112" width="240" height="92" rx="9"/>
-    <text class="lbl"    x="764" y="138" style="fill:var(--stop)">blocked — awaiting you</text>
-    <text class="lbl-sm" x="764" y="158">form filled · screenshot taken</text>
-    <text class="lbl-sm" x="764" y="176">ready to submit: org — title</text>
-    <text class="lbl-sm" x="764" y="194" style="fill:var(--stop)">nothing has been sent</text>
+    <!-- stage 4: one wall per tab — this is where a person acts -->
+    <g>
+      <rect class="box-stop pulse" x="600" y="66" width="230" height="52" rx="8"/>
+      <use href="#human" class="human" x="796" y="80" width="20" height="20"/>
+      <text class="lbl-sm" x="612" y="86" style="fill:var(--stop)">login required</text>
+      <text class="lbl-sm" x="612" y="104">tab 1 · greenhouse.io</text>
+    </g>
+    <g>
+      <rect class="box-stop pulse d1" x="600" y="132" width="230" height="52" rx="8"/>
+      <use href="#human" class="human" x="796" y="146" width="20" height="20"/>
+      <text class="lbl-sm" x="612" y="152" style="fill:var(--stop)">captcha · I am not a robot</text>
+      <text class="lbl-sm" x="612" y="170">tab 2 · lever.co</text>
+    </g>
+    <g>
+      <rect class="box-stop pulse d2" x="600" y="198" width="230" height="52" rx="8"/>
+      <use href="#human" class="human" x="796" y="212" width="20" height="20"/>
+      <text class="lbl-sm" x="612" y="218" style="fill:var(--stop)">ready to submit</text>
+      <text class="lbl-sm" x="612" y="236">tab 3 · ashbyhq.com</text>
+    </g>
 
-    <!-- travelling packets -->
+    <!-- wires walls → the person -->
+    <path class="wire-live" d="M 830 92 L 855 92 L 855 158 L 880 158"/>
+    <path class="wire-live" d="M 830 158 L 880 158"/>
+    <path class="wire-live" d="M 830 224 L 855 224 L 855 158 L 880 158"/>
+
+    <!-- stage 5: the person -->
+    <rect class="box-stop" x="880" y="104" width="280" height="108" rx="9"/>
+    <use href="#human" class="human" x="894" y="120" width="22" height="22"/>
+    <text class="lbl"    x="924" y="138" style="fill:var(--stop)">you — every wall, every send</text>
+    <text class="lbl-sm" x="894" y="162">fleet blocked · only the index</text>
+    <text class="lbl-sm" x="894" y="180">you open each tab: log in, pass</text>
+    <text class="lbl-sm" x="894" y="198">the check, answer, press submit</text>
+
+    <!-- travelling packets: green while a machine carries it, red once it needs a person -->
     <circle class="pkt flow p1 d0" r="4"/>
     <circle class="pkt flow p2 d1" r="4"/>
     <circle class="pkt flow p3 d2" r="4"/>
     <circle class="pkt flow q1 d1" r="4"/>
     <circle class="pkt flow q2 d2" r="4"/>
     <circle class="pkt flow q3 d3" r="4"/>
+    <circle class="pkt-stop flow w1 d2" r="4"/>
+    <circle class="pkt-stop flow w2 d3" r="4"/>
+    <circle class="pkt-stop flow w3 d4" r="4"/>
     <circle class="pkt-stop flow r1 d3" r="4"/>
     <circle class="pkt-stop flow r2 d4" r="4"/>
     <circle class="pkt-stop flow r3 d5" r="4"/>
   </svg>
   </div>
-  <figcaption>Every arrow into the red box is automatic. Nothing leaves it without you.</figcaption>
+  <figcaption>Green is a machine carrying the work; red is work that has stopped for a person.
+    Each worker hits its <em>own</em> wall in its <em>own</em> tab and leaves that tab open — the
+    walls are not pooled, and neither is your attention. Wherever the
+    <svg width="11" height="11" viewBox="0 0 24 24" class="human" style="vertical-align:-1px"
+         aria-hidden="true"><use href="#human"/></svg>
+    appears, nothing advances until you act.</figcaption>
 </figure>
 
 <h2>Requirements</h2>
@@ -313,21 +368,43 @@ cd ~/your-private-dir &amp;&amp; opp init &amp;&amp; opp ingest ~/cv.pdf</code><
   only its own tabs. Print mode (<code>claude -p</code>) has no browser at all, which is why the
   browser lane needs <code>fleet run --terminals</code> rather than <code>--headless</code>.</p>
 
-<h2>Where it stops</h2>
+<h2>Where it stops — once per tab, not once overall</h2>
 <div class="stopbox">
   <p><strong>A worker fills the form and stops.</strong> It screenshots the completed form and
-    blocks with <code>ready to submit: &lt;org&gt; — &lt;title&gt;</code>. It never clicks submit,
-    never types a password, never creates an account, never solves a CAPTCHA, never enters a
-    one-time code, and never enters bank, card or tax details.</p>
+    blocks with a precise reason. It never clicks submit, never types a password, never creates an
+    account, never solves a CAPTCHA, never enters a one-time code, and never enters bank, card or
+    tax details.</p>
   <p class="note" style="margin-bottom:0">Those rules travel inside each task
     (<code>&lt;package&gt;/fleet-task.json</code>) rather than living in the worker, so a worker
     cannot be configured into breaking them. A field that cannot be filled truthfully from your own
     profile is escalated to you, never guessed — most forms ask those questions under a
     declaration.</p>
 </div>
-<p>You clear the gate in batches:</p>
-<pre><code>fleet blocked          # everything waiting, grouped by reason
-fleet unblock --all    # release them back after you have dealt with each
+
+<p>Sites defend themselves differently, so <strong>each worker hits a different wall</strong>. The
+  moment it does, it <em>leaves its own tab open on that page</em> and claims the next task, so the
+  fleet keeps moving while that one waits for you. The tab is the handover — you walk into a page
+  already loaded and already filled, and do only the part a person has to do.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>What the tab is showing</th><th>Reason it blocked with</th><th>What only you can do</th></tr></thead>
+  <tbody>
+    <tr><td>A sign-in page</td><td><code>login required: &lt;site&gt;</code></td><td>Log in. Passwords are never typed by a worker.</td></tr>
+    <tr><td>“Verify you are human”</td><td><code>captcha: &lt;site&gt;</code></td><td>Pass the check yourself. Never bypassed, never automated.</td></tr>
+    <tr><td>A one-time code prompt</td><td><code>2fa: &lt;site&gt;</code></td><td>Enter the code from your own device.</td></tr>
+    <tr><td>A question not in your profile</td><td><code>needs answer: &lt;question&gt;</code></td><td>Answer it truthfully. A guess here is a false statement in your name.</td></tr>
+    <tr><td>Identity or payment documents</td><td><code>needs human: &lt;what it wants&gt;</code></td><td>Decide whether to continue at all — a form demanding these to <em>apply</em> is suspicious.</td></tr>
+    <tr><td>A completed form</td><td><code>ready to submit: &lt;org&gt; — &lt;title&gt;</code></td><td>Read it, then press submit.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p><code>fleet blocked</code> is the <em>index</em> of what is waiting, grouped by reason — not a
+  place the work happens. The work happens in each tab:</p>
+<pre><code>fleet blocked          # what is waiting, and why, grouped by reason
+                       # → then switch to each tab and clear it yourself
+fleet unblock --all    # release them back once you have dealt with them
 opp applied &lt;id&gt; --evidence "confirmation #12345 shown on screen"</code></pre>
 <p class="note">An application is recorded as <code>applied</code> only with the confirmation the
   system actually returned. A worker that cannot see one blocks with what it did see, rather than
